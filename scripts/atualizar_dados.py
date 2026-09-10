@@ -5,6 +5,11 @@ oficial do INE (Instituto Nacional de Estatística):
 - Indicador 0013042: "Vendas de alojamentos familiares (Metodologia 2022 -
   €/m²)" por concelho/região e quartil, desde 2022 (anual). Fonte:
   https://www.ine.pt/xurl/indx/0013042/PT
+- Indicador 0014711: "Rendas de novos contratos de arrendamento de
+  alojamentos familiares (Metodologia 2026 - €/m²)" por concelho/região e
+  quartil, desde 2022 (anual) — a série de arrendamento equivalente à de
+  vendas acima (o INE suspendeu esta série entre out/2025 e jun/2026, tendo
+  voltado a publicá-la com metodologia revista).
 - Indicador 0009201: "Índice de preços da habitação (Base - 2015)" nacional,
   trimestral, desde 2009. Fonte: https://www.ine.pt/xurl/indx/0009201/PT
 
@@ -90,6 +95,43 @@ def atualizar_precos_regionais(pasta_dados: str) -> int:
     return len(df)
 
 
+def atualizar_arrendamento_regional(pasta_dados: str) -> int:
+    """
+    Rendas de novos contratos de arrendamento por concelho/região e quartil
+    (€/m²/mês), últimos anos. Usa o mesmo mapa geográfico das vendas (os
+    códigos de localização do INE são os mesmos nos dois indicadores).
+    Grava dados/rendas_regionais.csv. Devolve o número de linhas gravadas.
+    """
+    mapa = pd.read_csv(os.path.join(pasta_dados, "mapa_geografico.csv"), dtype=str)
+    mapa_geocod = mapa.set_index("geocod")[["regiao", "nivel"]].to_dict("index")
+
+    dim1 = ",".join(f"S7A{ano}" for ano in ANOS_PRECOS_REGIONAIS)
+    registo = _pedir_indicador("0014711", dim1)
+
+    linhas = []
+    for ano, entradas in registo["Dados"].items():
+        for e in entradas:
+            info = mapa_geocod.get(e["geocod"])
+            if info is None:
+                logger.warning("geocod desconhecido (fora do mapa): %s (%s)", e["geocod"], e.get("geodsg"))
+                continue
+            linhas.append(
+                {
+                    "ano": int(ano),
+                    "geocod": e["geocod"],
+                    "regiao": info["regiao"],
+                    "nivel": info["nivel"],
+                    "quartil": e["dim_3_t"],
+                    "renda_m2": float(e["valor"]) if e.get("valor") not in (None, "") else None,
+                }
+            )
+
+    df = pd.DataFrame(linhas)
+    df.to_csv(os.path.join(pasta_dados, "rendas_regionais.csv"), index=False)
+    logger.info("rendas_regionais.csv atualizado: %d linhas.", len(df))
+    return len(df)
+
+
 def atualizar_indice_nacional(pasta_dados: str) -> int:
     """
     Índice de preços da habitação nacional, trimestral, desde 2009.
@@ -125,6 +167,7 @@ def main() -> int:
 
     for nome, funcao in [
         ("preços regionais", atualizar_precos_regionais),
+        ("rendas regionais", atualizar_arrendamento_regional),
         ("índice nacional", atualizar_indice_nacional),
     ]:
         try:

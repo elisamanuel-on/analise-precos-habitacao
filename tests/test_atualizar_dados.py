@@ -30,6 +30,21 @@ RESPOSTA_PRECOS_EXEMPLO = {
     },
 }
 
+RESPOSTA_RENDAS_EXEMPLO = {
+    "IndicadorCod": "0014711",
+    "UltimoPref": "2025",
+    "Dados": {
+        "2024": [
+            {"geocod": "PT", "geodsg": "Portugal", "dim_3_t": "2.º quartil", "valor": "8.5"},
+            {"geocod": "1950502", "geodsg": "Castelo Branco", "dim_3_t": "2.º quartil", "valor": "5.2"},
+        ],
+        "2025": [
+            {"geocod": "PT", "geodsg": "Portugal", "dim_3_t": "2.º quartil", "valor": "9.29"},
+            {"geocod": "1950502", "geodsg": "Castelo Branco", "dim_3_t": "2.º quartil", "valor": "5.8"},
+        ],
+    },
+}
+
 RESPOSTA_INDICE_EXEMPLO = {
     "IndicadorCod": "0009201",
     "Dados": {
@@ -83,6 +98,20 @@ def test_atualizar_precos_regionais_ignora_geocod_fora_do_mapa(pasta_dados_temp)
         total = atualizar_dados.atualizar_precos_regionais(pasta_dados_temp)
 
     assert total == 1  # só a linha "PT" está no mapa de teste
+
+
+def test_atualizar_arrendamento_regional_grava_csv_correto(pasta_dados_temp):
+    with patch.object(atualizar_dados, "_pedir_indicador", return_value=RESPOSTA_RENDAS_EXEMPLO):
+        total = atualizar_dados.atualizar_arrendamento_regional(pasta_dados_temp)
+
+    assert total == 4  # 2 anos x 2 linhas
+    df = pd.read_csv(os.path.join(pasta_dados_temp, "rendas_regionais.csv"))
+    assert set(df.columns) == {"ano", "geocod", "regiao", "nivel", "quartil", "renda_m2"}
+
+    linha = df[(df["ano"] == 2025) & (df["geocod"] == "1950502")].iloc[0]
+    assert linha["regiao"] == "Castelo Branco"
+    assert linha["nivel"] == "Concelho"
+    assert linha["renda_m2"] == 5.8
 
 
 def test_atualizar_indice_nacional_grava_csv_correto(pasta_dados_temp):

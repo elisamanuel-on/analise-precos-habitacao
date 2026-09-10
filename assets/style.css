@@ -96,6 +96,27 @@ body {
   margin: 0 0 10px;
 }
 
+.cartao-mapa {
+  margin-bottom: 20px;
+}
+
+.botao-download {
+  width: 100%;
+  padding: 9px 14px;
+  border: 1px solid #2f6f4f;
+  border-radius: 8px;
+  background: #2f6f4f;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.botao-download:hover {
+  background: #26593f;
+}
+
 .rodape {
   margin-top: 40px;
   font-size: 0.8rem;
