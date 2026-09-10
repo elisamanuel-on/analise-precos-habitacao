@@ -15,6 +15,9 @@ Nacional de Estatística) sobre o mercado de habitação em Portugal:
   a crise da dívida de 2011-2013 e a subida acentuada desde 2015).
 - **Mapa de Portugal por concelho**, com os 308 concelhos coloridos por
   preço/renda, para o ano/quartil selecionado.
+- **Download dos dados filtrados**, em CSV (formato português, pronto a abrir
+  no Excel) ou em Excel já formatado (cabeçalho, larguras de coluna, filtros
+  e 1ª linha fixa).
 
 Nenhum dos conjuntos de dados é simulado — vêm diretamente da
 [API pública do INE](https://www.ine.pt/xurl/indx/0013042/PT), sem
@@ -112,12 +115,14 @@ python app.py
 pytest -v
 ```
 
-Há dois tipos de testes: os do robô de atualização (`test_atualizar_dados.py`,
-com respostas simuladas da API do INE — não fazem pedidos reais) e os de
+Há três tipos de testes: os do robô de atualização (`test_atualizar_dados.py`,
+com respostas simuladas da API do INE — não fazem pedidos reais), os de
 qualidade dos dados (`test_dados.py`, que confirmam que os CSVs e o
 `concelhos.geojson` gravados no repositório continuam com a forma que a app
 espera, incluindo que todos os 308 concelhos têm correspondência entre o
-INE e o geojson do mapa).
+INE e o geojson do mapa) e os de exportação (`test_exportacao.py`, que
+confirmam que o CSV/Excel descarregados ficam com as colunas certas e que o
+`.xlsx` sai com a formatação esperada — cabeçalho, larguras, filtros).
 
 ## Deployment
 
@@ -143,8 +148,17 @@ INE e o geojson do mapa).
 - **Mapa sem chave de API**: o mapa usa `go.Choroplethmap` (baseado em
   MapLibre) com `map_style="carto-positron"`, um dos estilos de mapa base do
   Plotly que não precisa de token do Mapbox.
-- **Download dos dados filtrados**: o botão "Descarregar CSV" exporta
-  exatamente os dados por trás do gráfico de comparação atual (tipo, nível,
-  ano e quartil selecionados), não o ficheiro completo. O CSV usa `;` como
-  separador de colunas e `,` como separador decimal (formato português), para
-  abrir diretamente no Excel já dividido em colunas.
+- **Download dos dados filtrados**: os botões "Descarregar CSV" e
+  "Descarregar Excel" exportam exatamente os dados por trás do gráfico de
+  comparação atual (tipo, nível, ano e quartil selecionados), não o ficheiro
+  completo. Em ambos, as colunas ficam com nomes legíveis (ex: "Preço
+  (€/m²)" em vez de `preco_m2`) e ordenadas por região — o código interno do
+  INE (`geocod`) não é exportado, por não ter interesse fora da app.
+  - **CSV**: usa `;` como separador de colunas e `,` como separador decimal
+    (formato português), para abrir diretamente no Excel já dividido em
+    colunas.
+  - **Excel** (`.xlsx`, gerado com `openpyxl`): cabeçalho a negrito com fundo
+    verde, largura das colunas ajustada ao conteúdo, 1ª linha fixa ao scroll,
+    filtros automáticos no cabeçalho e a coluna de valores com separador de
+    milhares — pronto a apresentar ou a imprimir sem precisar de formatar
+    nada à mão.

@@ -14,12 +14,15 @@ concelho do INE à sua forma no mapa.
 
 Corre localmente com: python app.py  (abre http://localhost:8050)
 """
+import io
 import os
 
 import dash
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, State, dcc, html
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 PASTA_DADOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados")
 
@@ -43,6 +46,8 @@ TIPOS = {
         "unidade_eixo": "€ / m²",
         "formato_curto": "{:.0f}",
         "formato_hover": ".0f",
+        "rotulo_exportacao": "Preço (€/m²)",
+        "formato_excel": "#,##0",
     },
     "Arrendamento": {
         "df": df_arrendamento,
@@ -51,6 +56,8 @@ TIPOS = {
         "unidade_eixo": "€ / m² / mês",
         "formato_curto": "{:.2f}",
         "formato_hover": ".2f",
+        "rotulo_exportacao": "Renda (€/m²/mês)",
+        "formato_excel": "#,##0.00",
     },
 }
 TIPOS_DISPONIVEIS = list(TIPOS.keys())
@@ -144,6 +151,59 @@ def _dados_filtrados(tipo: str, nivel: str, ano: int, quartil: str) -> pd.DataFr
     return df[(df["nivel"] == nivel) & (df["ano"] == ano) & (df["quartil"] == quartil)].dropna(
         subset=[cfg["coluna"]]
     )
+
+
+def _dados_exportacao(tipo: str, nivel: str, ano: int, quartil: str) -> pd.DataFrame:
+    """
+    Prepara os dados filtrados para exportação (CSV/Excel): colunas com nomes
+    legíveis, sem o código interno do INE (geocod), ordenadas por região.
+    """
+    cfg = TIPOS[tipo]
+    df = _dados_filtrados(tipo, nivel, ano, quartil)[["regiao", "nivel", "ano", "quartil", cfg["coluna"]]].copy()
+    df = df.rename(
+        columns={
+            "regiao": "Região",
+            "nivel": "Nível geográfico",
+            "ano": "Ano",
+            "quartil": "Quartil",
+            cfg["coluna"]: cfg["rotulo_exportacao"],
+        }
+    )
+    return df.sort_values("Região").reset_index(drop=True)
+
+
+def _gerar_excel(df: pd.DataFrame, coluna_valor: str, formato_numero: str) -> bytes:
+    """
+    Gera um .xlsx "pronto a apresentar" a partir de um DataFrame já preparado
+    para exportação: cabeçalho a negrito com fundo verde, colunas com largura
+    ajustada ao conteúdo, 1ª linha fixa ao scroll (freeze panes), filtros
+    automáticos no cabeçalho e a coluna de valores com separador de milhares.
+    """
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Dados")
+        ws = writer.sheets["Dados"]
+
+        fundo_cabecalho = PatternFill(start_color="2F6F4F", end_color="2F6F4F", fill_type="solid")
+        fonte_cabecalho = Font(bold=True, color="FFFFFF")
+        for celula in ws[1]:
+            celula.fill = fundo_cabecalho
+            celula.font = fonte_cabecalho
+            celula.alignment = Alignment(horizontal="center", vertical="center")
+
+        for indice, coluna in enumerate(df.columns, start=1):
+            letra = get_column_letter(indice)
+            largura = max(len(str(coluna)), df[coluna].astype(str).map(len).max()) + 4
+            ws.column_dimensions[letra].width = largura
+
+        indice_valor = df.columns.get_loc(coluna_valor) + 1
+        for linha in range(2, ws.max_row + 1):
+            ws.cell(row=linha, column=indice_valor).number_format = formato_numero
+
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+
+    return buffer.getvalue()
 
 
 def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str) -> go.Figure:
@@ -286,6 +346,18 @@ app.layout = html.Div(
                     ],
                     className="filtro",
                 ),
+                html.Div(
+                    [
+                        html.Label(" "),
+                        html.Button(
+                            "📊 Descarregar Excel",
+                            id="botao-download-excel",
+                            className="botao-download botao-download-excel",
+                        ),
+                        dcc.Download(id="download-excel"),
+                    ],
+                    className="filtro",
+                ),
             ],
             className="filtros-linha",
         ),
@@ -398,7 +470,7 @@ def _atualizar_mapa(tipo, ano, quartil):
     prevent_initial_call=True,
 )
 def _descarregar_csv(n_clicks, tipo, nivel, ano, quartil):
-    df = _dados_filtrados(tipo, nivel, ano, quartil)
+    df = _dados_exportacao(tipo, nivel, ano, quartil)
     nome_ficheiro = f"{tipo.lower()}_{nivel.lower().replace(' ', '-')}_{ano}.csv"
     # Excel em português usa a vírgula como separador decimal, por isso espera
     # o ";" como separador de colunas (senão interpreta o ficheiro inteiro
@@ -413,6 +485,23 @@ def _descarregar_csv(n_clicks, tipo, nivel, ano, quartil):
         decimal=",",
         encoding="utf-8-sig",
     )
+
+
+@app.callback(
+    Output("download-excel", "data"),
+    Input("botao-download-excel", "n_clicks"),
+    State("filtro-tipo", "value"),
+    State("filtro-nivel", "value"),
+    State("filtro-ano", "value"),
+    State("filtro-quartil", "value"),
+    prevent_initial_call=True,
+)
+def _descarregar_excel(n_clicks, tipo, nivel, ano, quartil):
+    cfg = TIPOS[tipo]
+    df = _dados_exportacao(tipo, nivel, ano, quartil)
+    conteudo = _gerar_excel(df, cfg["rotulo_exportacao"], cfg["formato_excel"])
+    nome_ficheiro = f"{tipo.lower()}_{nivel.lower().replace(' ', '-')}_{ano}.xlsx"
+    return dcc.send_bytes(lambda buffer: buffer.write(conteudo), nome_ficheiro)
 
 
 if __name__ == "__main__":
