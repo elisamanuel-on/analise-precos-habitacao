@@ -1,0 +1,35 @@
+name: Atualizar dados do INE
+
+on:
+  schedule:
+    # todo o dia 1 de cada mês às 06:00 UTC — os dados do INE são trimestrais
+    # (índice nacional) ou anuais (preços por concelho), por isso não há
+    # necessidade de correr com mais frequência do que isto.
+    - cron: "0 6 1 * *"
+  workflow_dispatch: {}
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+      - name: Atualizar os dados a partir da API do INE
+        run: python -m scripts.atualizar_dados
+      - name: Publicar alterações (só se os dados mudaram)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- dados/; then
+            echo "Sem alterações nos dados."
+          else
+            git add dados/
+            git commit -m "chore: atualiza dados do INE (automático)"
+            git push
+          fi
