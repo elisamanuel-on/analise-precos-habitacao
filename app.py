@@ -186,7 +186,7 @@ def _mapa_concelhos(tipo: str, ano: int, quartil: str) -> go.Figure:
     )
 
     fig = go.Figure(
-        go.Choroplethmapbox(
+        go.Choroplethmap(
             geojson=GEOJSON_CONCELHOS,
             locations=df["con_code"],
             z=df[coluna],
@@ -200,9 +200,9 @@ def _mapa_concelhos(tipo: str, ano: int, quartil: str) -> go.Figure:
         )
     )
     fig.update_layout(
-        mapbox_style="carto-positron",
-        mapbox_zoom=5.0,
-        mapbox_center={"lat": 39.6, "lon": -8.2},
+        map_style="carto-positron",
+        map_zoom=5.0,
+        map_center={"lat": 39.6, "lon": -8.2},
         margin=dict(l=0, r=0, t=0, b=0),
         height=440,
         paper_bgcolor=CORES["cartao"],

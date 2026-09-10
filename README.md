@@ -140,8 +140,9 @@ INE e o geojson do mapa).
   fala com a API do INE.
 - **Dados reais desde o primeiro dia**: nenhuma parte da app usa dados de
   exemplo — os CSVs em `dados/` vêm diretamente da API oficial do INE.
-- **Mapa sem chave de API**: o mapa usa `mapbox_style="carto-positron"`, um
-  dos estilos de mapa base do Plotly que não precisa de token do Mapbox.
+- **Mapa sem chave de API**: o mapa usa `go.Choroplethmap` (baseado em
+  MapLibre) com `map_style="carto-positron"`, um dos estilos de mapa base do
+  Plotly que não precisa de token do Mapbox.
 - **Download dos dados filtrados**: o botão "Descarregar CSV" exporta
   exatamente os dados por trás do gráfico de comparação atual (tipo, nível,
   ano e quartil selecionados), não o ficheiro completo.
