@@ -145,4 +145,6 @@ INE e o geojson do mapa).
   Plotly que não precisa de token do Mapbox.
 - **Download dos dados filtrados**: o botão "Descarregar CSV" exporta
   exatamente os dados por trás do gráfico de comparação atual (tipo, nível,
-  ano e quartil selecionados), não o ficheiro completo.
+  ano e quartil selecionados), não o ficheiro completo. O CSV usa `;` como
+  separador de colunas e `,` como separador decimal (formato português), para
+  abrir diretamente no Excel já dividido em colunas.

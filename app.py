@@ -400,7 +400,19 @@ def _atualizar_mapa(tipo, ano, quartil):
 def _descarregar_csv(n_clicks, tipo, nivel, ano, quartil):
     df = _dados_filtrados(tipo, nivel, ano, quartil)
     nome_ficheiro = f"{tipo.lower()}_{nivel.lower().replace(' ', '-')}_{ano}.csv"
-    return dcc.send_data_frame(df.to_csv, nome_ficheiro, index=False)
+    # Excel em português usa a vírgula como separador decimal, por isso espera
+    # o ";" como separador de colunas (senão interpreta o ficheiro inteiro
+    # como uma única coluna). Aqui alinhamos com esse formato: ";" a separar
+    # colunas, "," como separador decimal, e um BOM UTF-8 (utf-8-sig) para
+    # que os acentos dos nomes das regiões apareçam corretamente no Excel.
+    return dcc.send_data_frame(
+        df.to_csv,
+        nome_ficheiro,
+        index=False,
+        sep=";",
+        decimal=",",
+        encoding="utf-8-sig",
+    )
 
 
 if __name__ == "__main__":
