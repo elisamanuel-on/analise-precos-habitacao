@@ -1,0 +1,348 @@
+geocod,regiao,nivel
+PT,Portugal,Nacional
+1,Continente,NUTS I
+11,Norte,NUTS II
+111,Alto Minho,NUTS III
+1111601,Arcos de Valdevez,Concelho
+1111602,Caminha,Concelho
+1111603,Melgaço,Concelho
+1111604,Monção,Concelho
+1111605,Paredes de Coura,Concelho
+1111606,Ponte da Barca,Concelho
+1111607,Ponte de Lima,Concelho
+1111608,Valença,Concelho
+1111609,Viana do Castelo,Concelho
+1111610,Vila Nova de Cerveira,Concelho
+112,Cávado,NUTS III
+1120301,Amares,Concelho
+1120302,Barcelos,Concelho
+1120303,Braga,Concelho
+1120306,Esposende,Concelho
+1120310,Terras de Bouro,Concelho
+1120313,Vila Verde,Concelho
+119,Ave,NUTS III
+1190304,Cabeceiras de Basto,Concelho
+1190307,Fafe,Concelho
+1190308,Guimarães,Concelho
+1191705,Mondim de Basto,Concelho
+1190309,Póvoa de Lanhoso,Concelho
+1190311,Vieira do Minho,Concelho
+1190312,Vila Nova de Famalicão,Concelho
+1190314,Vizela,Concelho
+11A,Área Metropolitana do Porto,NUTS III
+11A0104,Arouca,Concelho
+11A0107,Espinho,Concelho
+11A1304,Gondomar,Concelho
+11A1306,Maia,Concelho
+11A1308,Matosinhos,Concelho
+11A0113,Oliveira de Azeméis,Concelho
+11A1310,Paredes,Concelho
+11A1312,Porto,Concelho
+11A1313,Póvoa de Varzim,Concelho
+11A0109,Santa Maria da Feira,Concelho
+11A1314,Santo Tirso,Concelho
+11A0116,São João da Madeira,Concelho
+11A1318,Trofa,Concelho
+11A0119,Vale de Cambra,Concelho
+11A1315,Valongo,Concelho
+11A1316,Vila do Conde,Concelho
+11A1317,Vila Nova de Gaia,Concelho
+11B,Alto Tâmega e Barroso,NUTS III
+11B1702,Boticas,Concelho
+11B1703,Chaves,Concelho
+11B1706,Montalegre,Concelho
+11B1709,Ribeira de Pena,Concelho
+11B1712,Valpaços,Concelho
+11B1713,Vila Pouca de Aguiar,Concelho
+11C,Tâmega e Sousa,NUTS III
+11C1301,Amarante,Concelho
+11C1302,Baião,Concelho
+11C0106,Castelo de Paiva,Concelho
+11C0305,Celorico de Basto,Concelho
+11C1804,Cinfães,Concelho
+11C1303,Felgueiras,Concelho
+11C1305,Lousada,Concelho
+11C1307,Marco de Canaveses,Concelho
+11C1309,Paços de Ferreira,Concelho
+11C1311,Penafiel,Concelho
+11C1813,Resende,Concelho
+11D,Douro,NUTS III
+11D1701,Alijó,Concelho
+11D1801,Armamar,Concelho
+11D0403,Carrazeda de Ansiães,Concelho
+11D0404,Freixo de Espada à Cinta,Concelho
+11D1805,Lamego,Concelho
+11D1704,Mesão Frio,Concelho
+11D1807,Moimenta da Beira,Concelho
+11D1707,Murça,Concelho
+11D1812,Penedono,Concelho
+11D1708,Peso da Régua,Concelho
+11D1710,Sabrosa,Concelho
+11D1711,Santa Marta de Penaguião,Concelho
+11D1815,São João da Pesqueira,Concelho
+11D1818,Sernancelhe,Concelho
+11D1819,Tabuaço,Concelho
+11D1820,Tarouca,Concelho
+11D0409,Torre de Moncorvo,Concelho
+11D0914,Vila Nova de Foz Côa,Concelho
+11D1714,Vila Real,Concelho
+11E,Terras de Trás-os-Montes,NUTS III
+11E0401,Alfândega da Fé,Concelho
+11E0402,Bragança,Concelho
+11E0405,Macedo de Cavaleiros,Concelho
+11E0406,Miranda do Douro,Concelho
+11E0407,Mirandela,Concelho
+11E0408,Mogadouro,Concelho
+11E0410,Vila Flor,Concelho
+11E0411,Vimioso,Concelho
+11E0412,Vinhais,Concelho
+19,Centro,NUTS II
+191,Região de Aveiro,NUTS III
+1910101,Águeda,Concelho
+1910102,Albergaria-a-Velha,Concelho
+1910103,Anadia,Concelho
+1910105,Aveiro,Concelho
+1910108,Estarreja,Concelho
+1910110,Ílhavo,Concelho
+1910112,Murtosa,Concelho
+1910114,Oliveira do Bairro,Concelho
+1910115,Ovar,Concelho
+1910117,Sever do Vouga,Concelho
+1910118,Vagos,Concelho
+192,Região de Coimbra,NUTS III
+1920601,Arganil,Concelho
+1920602,Cantanhede,Concelho
+1920603,Coimbra,Concelho
+1920604,Condeixa-a-Nova,Concelho
+1920605,Figueira da Foz,Concelho
+1920606,Góis,Concelho
+1920607,Lousã,Concelho
+1920111,Mealhada,Concelho
+1920608,Mira,Concelho
+1920609,Miranda do Corvo,Concelho
+1920610,Montemor-o-Velho,Concelho
+1921808,Mortágua,Concelho
+1920611,Oliveira do Hospital,Concelho
+1920612,Pampilhosa da Serra,Concelho
+1920613,Penacova,Concelho
+1920614,Penela,Concelho
+1920615,Soure,Concelho
+1920616,Tábua,Concelho
+1920617,Vila Nova de Poiares,Concelho
+193,Região de Leiria,NUTS III
+1931002,Alvaiázere,Concelho
+1931003,Ansião,Concelho
+1931004,Batalha,Concelho
+1931007,Castanheira de Pêra,Concelho
+1931008,Figueiró dos Vinhos,Concelho
+1931009,Leiria,Concelho
+1931010,Marinha Grande,Concelho
+1931013,Pedrógão Grande,Concelho
+1931015,Pombal,Concelho
+1931016,Porto de Mós,Concelho
+194,Viseu Dão Lafões,NUTS III
+1940901,Aguiar da Beira,Concelho
+1941802,Carregal do Sal,Concelho
+1941803,Castro Daire,Concelho
+1941806,Mangualde,Concelho
+1941809,Nelas,Concelho
+1941810,Oliveira de Frades,Concelho
+1941811,Penalva do Castelo,Concelho
+1941814,Santa Comba Dão,Concelho
+1941816,São Pedro do Sul,Concelho
+1941817,Sátão,Concelho
+1941821,Tondela,Concelho
+1941822,Vila Nova de Paiva,Concelho
+1941823,Viseu,Concelho
+1941824,Vouzela,Concelho
+195,Beira Baixa,NUTS III
+1950502,Castelo Branco,Concelho
+1950505,Idanha-a-Nova,Concelho
+1950506,Oleiros,Concelho
+1950507,Penamacor,Concelho
+1950508,Proença-a-Nova,Concelho
+1950509,Sertã,Concelho
+1950510,Vila de Rei,Concelho
+1950511,Vila Velha de Ródão,Concelho
+196,Beiras e Serra da Estrela,NUTS III
+1960902,Almeida,Concelho
+1960501,Belmonte,Concelho
+1960903,Celorico da Beira,Concelho
+1960503,Covilhã,Concelho
+1960904,Figueira de Castelo Rodrigo,Concelho
+1960905,Fornos de Algodres,Concelho
+1960504,Fundão,Concelho
+1960906,Gouveia,Concelho
+1960907,Guarda,Concelho
+1960908,Manteigas,Concelho
+1960909,Mêda,Concelho
+1960910,Pinhel,Concelho
+1960911,Sabugal,Concelho
+1960912,Seia,Concelho
+1960913,Trancoso,Concelho
+1D,Oeste e Vale do Tejo,NUTS II
+1D1,Oeste,NUTS III
+1D11001,Alcobaça,Concelho
+1D11101,Alenquer,Concelho
+1D11102,Arruda dos Vinhos,Concelho
+1D11005,Bombarral,Concelho
+1D11104,Cadaval,Concelho
+1D11006,Caldas da Rainha,Concelho
+1D11108,Lourinhã,Concelho
+1D11011,Nazaré,Concelho
+1D11012,Óbidos,Concelho
+1D11014,Peniche,Concelho
+1D11112,Sobral de Monte Agraço,Concelho
+1D11113,Torres Vedras,Concelho
+1D2,Médio Tejo,NUTS III
+1D21401,Abrantes,Concelho
+1D21402,Alcanena,Concelho
+1D21408,Constância,Concelho
+1D21410,Entroncamento,Concelho
+1D21411,Ferreira do Zêzere,Concelho
+1D21413,Mação,Concelho
+1D21421,Ourém,Concelho
+1D21417,Sardoal,Concelho
+1D21418,Tomar,Concelho
+1D21419,Torres Novas,Concelho
+1D21420,Vila Nova da Barquinha,Concelho
+1D3,Lezíria do Tejo,NUTS III
+1D31403,Almeirim,Concelho
+1D31404,Alpiarça,Concelho
+1D31103,Azambuja,Concelho
+1D31405,Benavente,Concelho
+1D31406,Cartaxo,Concelho
+1D31407,Chamusca,Concelho
+1D31409,Coruche,Concelho
+1D31412,Golegã,Concelho
+1D31414,Rio Maior,Concelho
+1D31415,Salvaterra de Magos,Concelho
+1D31416,Santarém,Concelho
+1A,Grande Lisboa,NUTS II
+1A0,Grande Lisboa,NUTS III
+1A01115,Amadora,Concelho
+1A01105,Cascais,Concelho
+1A01106,Lisboa,Concelho
+1A01107,Loures,Concelho
+1A01109,Mafra,Concelho
+1A01116,Odivelas,Concelho
+1A01110,Oeiras,Concelho
+1A01111,Sintra,Concelho
+1A01114,Vila Franca de Xira,Concelho
+1B,Península de Setúbal,NUTS II
+1B0,Península de Setúbal,NUTS III
+1B01502,Alcochete,Concelho
+1B01503,Almada,Concelho
+1B01504,Barreiro,Concelho
+1B01506,Moita,Concelho
+1B01507,Montijo,Concelho
+1B01508,Palmela,Concelho
+1B01510,Seixal,Concelho
+1B01511,Sesimbra,Concelho
+1B01512,Setúbal,Concelho
+1C,Alentejo,NUTS II
+1C1,Alentejo Litoral,NUTS III
+1C11501,Alcácer do Sal,Concelho
+1C11505,Grândola,Concelho
+1C10211,Odemira,Concelho
+1C11509,Santiago do Cacém,Concelho
+1C11513,Sines,Concelho
+1C2,Baixo Alentejo,NUTS III
+1C20201,Aljustrel,Concelho
+1C20202,Almodôvar,Concelho
+1C20203,Alvito,Concelho
+1C20204,Barrancos,Concelho
+1C20205,Beja,Concelho
+1C20206,Castro Verde,Concelho
+1C20207,Cuba,Concelho
+1C20208,Ferreira do Alentejo,Concelho
+1C20209,Mértola,Concelho
+1C20210,Moura,Concelho
+1C20212,Ourique,Concelho
+1C20213,Serpa,Concelho
+1C20214,Vidigueira,Concelho
+1C3,Alto Alentejo,NUTS III
+1C31201,Alter do Chão,Concelho
+1C31202,Arronches,Concelho
+1C31203,Avis,Concelho
+1C31204,Campo Maior,Concelho
+1C31205,Castelo de Vide,Concelho
+1C31206,Crato,Concelho
+1C31207,Elvas,Concelho
+1C31208,Fronteira,Concelho
+1C31209,Gavião,Concelho
+1C31210,Marvão,Concelho
+1C31211,Monforte,Concelho
+1C31212,Nisa,Concelho
+1C31213,Ponte de Sor,Concelho
+1C31214,Portalegre,Concelho
+1C31215,Sousel,Concelho
+1C4,Alentejo Central,NUTS III
+1C40701,Alandroal,Concelho
+1C40702,Arraiolos,Concelho
+1C40703,Borba,Concelho
+1C40704,Estremoz,Concelho
+1C40705,Évora,Concelho
+1C40706,Montemor-o-Novo,Concelho
+1C40707,Mora,Concelho
+1C40708,Mourão,Concelho
+1C40709,Portel,Concelho
+1C40710,Redondo,Concelho
+1C40711,Reguengos de Monsaraz,Concelho
+1C40712,Vendas Novas,Concelho
+1C40713,Viana do Alentejo,Concelho
+1C40714,Vila Viçosa,Concelho
+15,Algarve,NUTS II
+150,Algarve,NUTS III
+1500801,Albufeira,Concelho
+1500802,Alcoutim,Concelho
+1500803,Aljezur,Concelho
+1500804,Castro Marim,Concelho
+1500805,Faro,Concelho
+1500806,Lagoa,Concelho
+1500807,Lagos,Concelho
+1500808,Loulé,Concelho
+1500809,Monchique,Concelho
+1500810,Olhão,Concelho
+1500811,Portimão,Concelho
+1500812,São Brás de Alportel,Concelho
+1500813,Silves,Concelho
+1500814,Tavira,Concelho
+1500815,Vila do Bispo,Concelho
+1500816,Vila Real de Santo António,Concelho
+2,Região Autónoma dos Açores,NUTS I
+20,Região Autónoma dos Açores,NUTS II
+200,Região Autónoma dos Açores,NUTS III
+2004301,Angra do Heroísmo,Concelho
+2004501,Calheta (R.A.A.),Concelho
+2004901,Corvo,Concelho
+2004701,Horta,Concelho
+2004201,Lagoa (R.A.A.),Concelho
+2004801,Lajes das Flores,Concelho
+2004601,Lajes do Pico,Concelho
+2004602,Madalena,Concelho
+2004202,Nordeste,Concelho
+2004203,Ponta Delgada,Concelho
+2004204,Povoação,Concelho
+2004205,Ribeira Grande,Concelho
+2004401,Santa Cruz da Graciosa,Concelho
+2004802,Santa Cruz das Flores,Concelho
+2004603,São Roque do Pico,Concelho
+2004502,Velas,Concelho
+2004302,Vila da Praia da Vitória,Concelho
+2004101,Vila do Porto,Concelho
+2004206,Vila Franca do Campo,Concelho
+3,Região Autónoma da Madeira,NUTS I
+30,Região Autónoma da Madeira,NUTS II
+300,Região Autónoma da Madeira,NUTS III
+3003101,Calheta (R.A.M.),Concelho
+3003102,Câmara de Lobos,Concelho
+3003103,Funchal,Concelho
+3003104,Machico,Concelho
+3003105,Ponta do Sol,Concelho
+3003106,Porto Moniz,Concelho
+3003107,Ribeira Brava,Concelho
+3003108,Santa Cruz,Concelho
+3003109,Santana,Concelho
+3003110,São Vicente,Concelho
+3003201,Porto Santo,Concelho
