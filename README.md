@@ -14,7 +14,13 @@ Nacional de Estatística) sobre o mercado de habitação em Portugal:
   2009 — mostra a evolução do mercado ao longo de mais de 15 anos (incluindo
   a crise da dívida de 2011-2013 e a subida acentuada desde 2015).
 - **Mapa de Portugal por concelho**, com os 308 concelhos coloridos por
-  preço/renda, para o ano/quartil selecionado.
+  preço/renda, para o ano/quartil selecionado — com dois modos: **nível de
+  preço** (absoluto) ou **variação homóloga (%)** face ao ano anterior
+  (escala divergente azul/vermelho).
+- **Índice nacional com as 3 séries do INE** (Total, Novos, Existentes),
+  não só o total.
+- **Modo escuro**, com o botão no canto superior direito a guardar a
+  preferência no navegador.
 - **Download dos dados filtrados**, em CSV (formato português, pronto a abrir
   no Excel) ou em Excel já formatado (cabeçalho, larguras de coluna, filtros
   e 1ª linha fixa).
@@ -134,6 +140,17 @@ confirmam que o CSV/Excel descarregados ficam com as colunas certas e que o
   pode ser corrido manualmente a partir do separador "Actions" do
   repositório ("Run workflow"). Quando há dados novos, o robô faz commit
   automático — isso dispara um novo deploy no Render.
+
+## Cores e acessibilidade
+
+As cores seguem um método de "uma cor por papel" (sequencial para nível de
+preço, categórica de ordem fixa para as 3 séries do índice, divergente para
+a variação homóloga), com as combinações validadas para separação de cor em
+daltonismo e contraste em ambos os temas — ver
+`node scripts/validate_palette.js` na skill `dataviz` usada para o desenho.
+O tema escuro usa um verde mais claro (`#45a06e`) do que o da marca
+(`#2f6f4f`), que só dá 2,9:1 de contraste sobre o fundo escuro; o mais claro
+dá 5,4:1.
 
 ## Notas de design
 
