@@ -417,6 +417,41 @@ def _mapa_concelhos(tipo: str, ano: int, quartil: str, tema: str = "claro", modo
 app = dash.Dash(__name__, title="Análise de Preços de Habitação em Portugal")
 server = app.server  # necessário para o Render (gunicorn aponta para "app:server")
 
+# Aplica o tema guardado (localStorage) ANTES da primeira pintura da página,
+# num <script> bloqueante logo no <head> — sem isto, uma visita com o tema
+# escuro já guardado mostrava sempre um instante de tema claro antes do
+# JavaScript do Dash arrancar e corrigir o atributo "data-theme".
+app.index_string = """<!DOCTYPE html>
+<html>
+    <head>
+        <script>
+        (function () {
+            try {
+                var guardado = window.localStorage.getItem("tema-armazenado");
+                var tema = guardado ? JSON.parse(guardado) : "claro";
+                document.documentElement.setAttribute(
+                    "data-theme", tema === "escuro" ? "dark" : "light"
+                );
+            } catch (erro) {
+                // localStorage indisponível (ex.: navegação privada) — fica no tema claro por omissão.
+            }
+        })();
+        </script>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>"""
+
 app.layout = html.Div(
     [
         dcc.Store(id="tema-armazenado", storage_type="local", data="claro"),
