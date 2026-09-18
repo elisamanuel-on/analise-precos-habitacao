@@ -139,18 +139,43 @@ body {
   margin-bottom: 4px;
 }
 
-/* Dropdowns (dcc.Dropdown / react-select) no tema escuro */
-.filtro .Select-control,
-.filtro .dash-dropdown .Select-control {
-  background: var(--cartao);
-  border-color: var(--borda);
+/* Dropdowns (dcc.Dropdown / react-select): a folha de estilo interna do Dash
+   carrega depois de assets/style.css e usa as mesmas classes com a mesma
+   especificidade, por isso ganha por ordem — só o !important garante que
+   o tema escuro também se aplica aqui. */
+.filtro .Select-control {
+  background-color: var(--cartao) !important;
+  border-color: var(--borda) !important;
 }
-.filtro .Select-menu-outer,
 .filtro .Select-value-label,
 .filtro .Select-placeholder,
-.filtro input {
-  background: var(--cartao);
-  color: var(--texto);
+.filtro .Select-input input,
+.filtro .Select-input input::placeholder {
+  color: var(--texto) !important;
+}
+.filtro .Select-arrow {
+  border-color: var(--texto-suave) transparent transparent !important;
+}
+.filtro.is-open .Select-arrow {
+  border-color: transparent transparent var(--texto-suave) !important;
+}
+.filtro .Select-menu-outer,
+.filtro .Select-menu {
+  background-color: var(--cartao) !important;
+  border-color: var(--borda) !important;
+}
+.filtro .Select-option {
+  background-color: var(--cartao) !important;
+  color: var(--texto) !important;
+}
+.filtro .Select-option.is-focused,
+.filtro .Select-option.is-selected {
+  background-color: var(--destaque-suave) !important;
+  color: var(--texto) !important;
+}
+.filtro .Select-noresults {
+  background-color: var(--cartao) !important;
+  color: var(--texto-suave) !important;
 }
 
 .graficos-grelha {
