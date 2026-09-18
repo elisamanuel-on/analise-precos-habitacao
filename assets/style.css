@@ -147,11 +147,16 @@ body {
   background-color: var(--cartao) !important;
   border-color: var(--borda) !important;
 }
-.filtro .Select-value-label,
-.filtro .Select-placeholder,
-.filtro .Select-input input,
-.filtro .Select-input input::placeholder {
+/* Wildcard: cobre o texto do valor selecionado seja qual for a subclasse
+   exata que o Dash usar por baixo de .Select-control (varia ligeiramente
+   entre versões) — mais seguro do que apostar num nome de classe só. */
+.filtro .Select-control,
+.filtro .Select-control * {
   color: var(--texto) !important;
+}
+.filtro .Select-placeholder,
+.filtro .Select-input input::placeholder {
+  color: var(--texto-suave) !important;
 }
 .filtro .Select-arrow {
   border-color: var(--texto-suave) transparent transparent !important;
@@ -164,12 +169,15 @@ body {
   background-color: var(--cartao) !important;
   border-color: var(--borda) !important;
 }
-.filtro .Select-option {
+.filtro .Select-option,
+.filtro .Select-option * {
   background-color: var(--cartao) !important;
   color: var(--texto) !important;
 }
 .filtro .Select-option.is-focused,
-.filtro .Select-option.is-selected {
+.filtro .Select-option.is-focused *,
+.filtro .Select-option.is-selected,
+.filtro .Select-option.is-selected * {
   background-color: var(--destaque-suave) !important;
   color: var(--texto) !important;
 }
