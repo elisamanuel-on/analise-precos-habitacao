@@ -161,8 +161,25 @@ body {
 .filtro .Select-arrow {
   border-color: var(--texto-suave) transparent transparent !important;
 }
-.filtro.is-open .Select-arrow {
+/* "is-open" fica no wrapper .Select, não em .filtro — tem de ser descendente,
+   não composto (".filtro.is-open" nunca combinava com nada). */
+.filtro .is-open .Select-arrow {
   border-color: transparent transparent var(--texto-suave) !important;
+}
+/* O campo de pesquisa que aparece ao abrir o dropdown herda a aparência
+   nativa do sistema operativo (caixa branca arredondada com lupa) — sem
+   "appearance: none" o fundo/cor definidos acima não têm efeito nele. */
+.filtro input {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+  color: var(--texto) !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+.filtro .is-open .Select-control {
+  background-color: var(--cartao) !important;
 }
 .filtro .Select-menu-outer,
 .filtro .Select-menu {
