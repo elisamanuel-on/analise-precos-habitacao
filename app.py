@@ -64,12 +64,19 @@ TIPOS_DISPONIVEIS = list(TIPOS.keys())
 
 ANOS_DISPONIVEIS = sorted(df_vendas["ano"].unique().tolist())
 ANO_MAIS_RECENTE = ANOS_DISPONIVEIS[-1]
+ANO_MAIS_ANTIGO = ANOS_DISPONIVEIS[0]
 NIVEIS_DISPONIVEIS = ["NUTS II", "NUTS III", "Concelho"]
 QUARTIS_DISPONIVEIS = sorted(df_vendas["quartil"].dropna().unique().tolist())
 QUARTIL_MEDIANA = "2.º quartil"
 
-CORES = {
-    "fundo": "#f7f7f5",
+# --- Cores: claro/escuro, seguindo o método "um valor por papel" -----------
+# Sequencial (nível de preço, no mapa e nas barras): um único tom (a cor da
+# marca), do mais claro ao mais escuro. Categórico (as 3 séries do índice
+# nacional): ordem fixa e validada (ΔE >= 8 entre todos os pares, em ambos os
+# temas — ver node scripts/validate_palette.js). Divergente (variação
+# homóloga, no mapa): dois polos + cinzento neutro no meio.
+CORES_CLARO = {
+    "fundo": "#f9f9f7",
     "cartao": "#ffffff",
     "borda": "#e4e2dd",
     "texto": "#2b2b28",
@@ -77,6 +84,34 @@ CORES = {
     "destaque": "#2f6f4f",
     "destaque_suave": "#e5f0ea",
 }
+CORES_ESCURO = {
+    "fundo": "#0d0d0d",
+    "cartao": "#1a1a19",
+    "borda": "#2c2c2a",
+    "texto": "#f2f2f0",
+    "texto_suave": "#c3c2b7",
+    # o verde da marca (#2f6f4f) só dá 2.9:1 sobre o fundo escuro (#1a1a19);
+    # este tom mais claro dá 5.4:1, mantendo a mesma família de cor.
+    "destaque": "#45a06e",
+    "destaque_suave": "rgba(69, 160, 110, 0.16)",
+}
+
+# Categórico (índice nacional: Total / Novos / Existentes) — primeiras 3 cores
+# da paleta categórica validada (ordem fixa, nunca trocada entre séries).
+CORES_CATEGORICAS = {
+    "claro": ["#2a78d6", "#eb6834", "#1baf7a"],
+    "escuro": ["#3987e5", "#d95926", "#199e70"],
+}
+
+# Divergente (variação homóloga no mapa) — polos + cinzento neutro no meio.
+CORES_DIVERGENTE = {
+    "claro": {"negativo": "#2a78d6", "neutro": "#f0efec", "positivo": "#e34948"},
+    "escuro": {"negativo": "#3987e5", "neutro": "#383835", "positivo": "#e66767"},
+}
+
+
+def _cores(tema: str) -> dict:
+    return CORES_ESCURO if tema == "escuro" else CORES_CLARO
 
 
 def _kpis_para_ano(tipo: str, ano: int) -> dict:
@@ -119,28 +154,68 @@ def _cartao_kpi(titulo: str, valor: str, nota: str = "") -> html.Div:
     return html.Div(filhos, className="kpi-cartao")
 
 
-def _linha_evolucao_nacional() -> go.Figure:
-    df = df_indice[df_indice["categoria"] == "Total"]
+def _linha_evolucao_nacional(tema: str = "claro") -> go.Figure:
+    """
+    Evolução do índice nacional de vendas desde 2009, com as 3 séries do INE
+    (Total, Novos, Existentes) — cor categórica de ordem fixa, legenda,
+    hover unificado com linha de referência (spike) e rótulo no fim de cada
+    linha (a "válvula de alívio" exigida quando uma das cores, no modo claro,
+    fica abaixo do contraste mínimo de 3:1 face à superfície).
+    """
+    cores = _cores(tema)
+    paleta = CORES_CATEGORICAS[tema]
+    categorias = [
+        ("Total", paleta[0], True),
+        ("Novos", paleta[1], False),
+        ("Existentes", paleta[2], False),
+    ]
+
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
+    for nome, cor, preencher in categorias:
+        df = df_indice[df_indice["categoria"] == nome].sort_values("periodo")
+        if df.empty:
+            continue
+        kwargs = dict(
             x=df["periodo"],
             y=df["indice"],
             mode="lines",
-            line=dict(color=CORES["destaque"], width=2.5),
-            fill="tozeroy",
-            fillcolor=CORES["destaque_suave"],
-            hovertemplate="%{x}<br>Índice: %{y:.1f}<extra></extra>",
+            name=nome,
+            line=dict(color=cor, width=2.5 if nome == "Total" else 1.75),
+            hovertemplate=f"{nome}: " + "%{y:.1f}<extra></extra>",
         )
-    )
+        if preencher:
+            kwargs["fill"] = "tozeroy"
+            kwargs["fillcolor"] = cores["destaque_suave"]
+        fig.add_trace(go.Scatter(**kwargs))
+        ultimo = df.iloc[-1]
+        fig.add_annotation(
+            x=ultimo["periodo"],
+            y=ultimo["indice"],
+            text=f" {nome}",
+            showarrow=False,
+            xanchor="left",
+            font=dict(color=cor, size=11),
+        )
+
     fig.update_layout(
-        margin=dict(l=10, r=10, t=10, b=10),
+        margin=dict(l=10, r=48, t=10, b=10),
         height=340,
-        plot_bgcolor=CORES["cartao"],
-        paper_bgcolor=CORES["cartao"],
-        font=dict(color=CORES["texto"], family="system-ui, sans-serif"),
-        xaxis=dict(showgrid=False, tickangle=-45, nticks=16),
-        yaxis=dict(showgrid=True, gridcolor=CORES["borda"], title="Índice (Base 2015 = 100)"),
+        plot_bgcolor=cores["cartao"],
+        paper_bgcolor=cores["cartao"],
+        font=dict(color=cores["texto"], family="system-ui, sans-serif"),
+        hovermode="x unified",
+        showlegend=False,  # os rótulos no fim de cada linha substituem a legenda
+        xaxis=dict(
+            showgrid=False,
+            tickangle=-45,
+            nticks=16,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikecolor=cores["texto_suave"],
+            spikethickness=1,
+        ),
+        yaxis=dict(showgrid=True, gridcolor=cores["borda"], title="Índice (Base 2015 = 100)"),
     )
     return fig
 
@@ -206,9 +281,10 @@ def _gerar_excel(df: pd.DataFrame, coluna_valor: str, formato_numero: str) -> by
     return buffer.getvalue()
 
 
-def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str) -> go.Figure:
+def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str, tema: str = "claro") -> go.Figure:
     cfg = TIPOS[tipo]
     coluna = cfg["coluna"]
+    cores = _cores(tema)
     df = _dados_filtrados(tipo, nivel, ano, quartil).sort_values(coluna, ascending=True)
 
     # Concelho tem 308 barras — mostra só as 25 mais caras para o gráfico ficar legível
@@ -221,7 +297,7 @@ def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str) -> go.Figu
             x=df[coluna],
             y=df["regiao"],
             orientation="h",
-            marker_color=CORES["destaque"],
+            marker_color=cores["destaque"],
             hovertemplate="%{y}<br>%{x:" + cfg["formato_hover"] + "} " + cfg["unidade"] + "<extra></extra>",
         )
     )
@@ -229,43 +305,111 @@ def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str) -> go.Figu
     fig.update_layout(
         margin=dict(l=10, r=10, t=10, b=10),
         height=altura,
-        plot_bgcolor=CORES["cartao"],
-        paper_bgcolor=CORES["cartao"],
-        font=dict(color=CORES["texto"], family="system-ui, sans-serif"),
-        xaxis=dict(showgrid=True, gridcolor=CORES["borda"], title=cfg["unidade_eixo"]),
+        plot_bgcolor=cores["cartao"],
+        paper_bgcolor=cores["cartao"],
+        font=dict(color=cores["texto"], family="system-ui, sans-serif"),
+        xaxis=dict(showgrid=True, gridcolor=cores["borda"], title=cfg["unidade_eixo"]),
         yaxis=dict(showgrid=False),
     )
     return fig
 
 
-def _mapa_concelhos(tipo: str, ano: int, quartil: str) -> go.Figure:
+def _variacao_por_concelho(tipo: str, ano: int, quartil: str) -> pd.DataFrame:
+    """
+    Variação homóloga (%) do preço/renda por concelho, face ao ano anterior.
+    Devolve geocod/regiao/variacao_pct — vazio (sem levantar erro) quando o
+    ano anterior não está disponível (ex.: o primeiro ano da série).
+    """
     cfg = TIPOS[tipo]
     coluna = cfg["coluna"]
-    df = _dados_filtrados(tipo, "Concelho", ano, quartil).merge(
-        df_crosswalk[["geocod", "con_code"]], on="geocod", how="inner"
-    )
+    if ano - 1 not in ANOS_DISPONIVEIS:
+        return pd.DataFrame(columns=["geocod", "regiao", "variacao_pct"])
 
-    fig = go.Figure(
-        go.Choroplethmap(
-            geojson=GEOJSON_CONCELHOS,
-            locations=df["con_code"],
-            z=df[coluna],
-            featureidkey="properties.con_code",
-            colorscale=[[0, CORES["destaque_suave"]], [1, CORES["destaque"]]],
-            marker_line_width=0.3,
-            marker_line_color="#ffffff",
-            colorbar=dict(title=cfg["unidade"], thickness=14, len=0.8),
-            text=df["regiao"],
-            hovertemplate="%{text}<br>%{z:" + cfg["formato_hover"] + "} " + cfg["unidade"] + "<extra></extra>",
-        )
+    atual = _dados_filtrados(tipo, "Concelho", ano, quartil)[["geocod", "regiao", coluna]]
+    anterior = _dados_filtrados(tipo, "Concelho", ano - 1, quartil)[["geocod", coluna]].rename(
+        columns={coluna: "valor_anterior"}
     )
+    fundido = atual.merge(anterior, on="geocod", how="inner")
+    fundido = fundido[fundido["valor_anterior"] > 0]
+    fundido["variacao_pct"] = (fundido[coluna] / fundido["valor_anterior"] - 1) * 100
+    return fundido[["geocod", "regiao", "variacao_pct"]]
+
+
+def _mapa_concelhos(tipo: str, ano: int, quartil: str, tema: str = "claro", modo: str = "nivel") -> go.Figure:
+    cfg = TIPOS[tipo]
+    cores = _cores(tema)
+
+    if modo == "variacao":
+        df_var = _variacao_por_concelho(tipo, ano, quartil)
+        if df_var.empty:
+            fig = go.Figure()
+            fig.update_layout(
+                height=440,
+                paper_bgcolor=cores["cartao"],
+                plot_bgcolor=cores["cartao"],
+                font=dict(color=cores["texto_suave"], family="system-ui, sans-serif"),
+                xaxis=dict(visible=False),
+                yaxis=dict(visible=False),
+                annotations=[
+                    dict(
+                        text=f"Sem dados de {ano - 1} para calcular a variação homóloga de {ano}.",
+                        showarrow=False,
+                        font=dict(size=13),
+                    )
+                ],
+            )
+            return fig
+
+        df = df_var.merge(df_crosswalk[["geocod", "con_code"]], on="geocod", how="inner")
+        limite = max(abs(df["variacao_pct"].min()), abs(df["variacao_pct"].max()), 0.1)
+        paleta_div = CORES_DIVERGENTE[tema]
+        fig = go.Figure(
+            go.Choroplethmap(
+                geojson=GEOJSON_CONCELHOS,
+                locations=df["con_code"],
+                z=df["variacao_pct"],
+                featureidkey="properties.con_code",
+                zmin=-limite,
+                zmax=limite,
+                colorscale=[
+                    [0, paleta_div["negativo"]],
+                    [0.5, paleta_div["neutro"]],
+                    [1, paleta_div["positivo"]],
+                ],
+                marker_line_width=0.3,
+                marker_line_color=cores["cartao"],
+                colorbar=dict(title="Variação (%)", thickness=14, len=0.8, ticksuffix="%"),
+                text=df["regiao"],
+                hovertemplate="%{text}<br>%{z:+.1f}% face a " + str(ano - 1) + "<extra></extra>",
+            )
+        )
+    else:
+        coluna = cfg["coluna"]
+        df = _dados_filtrados(tipo, "Concelho", ano, quartil).merge(
+            df_crosswalk[["geocod", "con_code"]], on="geocod", how="inner"
+        )
+        fig = go.Figure(
+            go.Choroplethmap(
+                geojson=GEOJSON_CONCELHOS,
+                locations=df["con_code"],
+                z=df[coluna],
+                featureidkey="properties.con_code",
+                colorscale=[[0, cores["destaque_suave"]], [1, cores["destaque"]]],
+                marker_line_width=0.3,
+                marker_line_color=cores["cartao"],
+                colorbar=dict(title=cfg["unidade"], thickness=14, len=0.8),
+                text=df["regiao"],
+                hovertemplate="%{text}<br>%{z:" + cfg["formato_hover"] + "} " + cfg["unidade"] + "<extra></extra>",
+            )
+        )
+
     fig.update_layout(
-        map_style="carto-positron",
+        map_style="carto-positron" if tema == "claro" else "carto-darkmatter",
         map_zoom=5.0,
         map_center={"lat": 39.6, "lon": -8.2},
         margin=dict(l=0, r=0, t=0, b=0),
         height=440,
-        paper_bgcolor=CORES["cartao"],
+        paper_bgcolor=cores["cartao"],
     )
     return fig
 
@@ -275,15 +419,22 @@ server = app.server  # necessário para o Render (gunicorn aponta para "app:serv
 
 app.layout = html.Div(
     [
+        dcc.Store(id="tema-armazenado", storage_type="local", data="claro"),
+        html.Div(id="tema-dummy", style={"display": "none"}),
         html.Div(
             [
-                html.H1("Análise de Preços de Habitação em Portugal"),
-                html.P(
-                    "Dados reais e oficiais do INE (Instituto Nacional de Estatística): "
-                    "vendas e arrendamento de alojamentos familiares por concelho, e a "
-                    "evolução do índice de preços de venda da habitação desde 2009.",
-                    className="subtitulo",
+                html.Div(
+                    [
+                        html.H1("Análise de Preços de Habitação em Portugal"),
+                        html.P(
+                            "Dados reais e oficiais do INE (Instituto Nacional de Estatística): "
+                            "vendas e arrendamento de alojamentos familiares por concelho, e a "
+                            "evolução do índice de preços de venda da habitação desde 2009.",
+                            className="subtitulo",
+                        ),
+                    ]
                 ),
+                html.Button("🌙 Modo escuro", id="botao-tema", className="botao-tema"),
             ],
             className="cabecalho",
         ),
@@ -363,7 +514,26 @@ app.layout = html.Div(
         ),
         html.Div(
             [
-                html.H2("Mapa por concelho"),
+                html.Div(
+                    [
+                        html.H2("Mapa por concelho"),
+                        dcc.RadioItems(
+                            id="filtro-modo-mapa",
+                            options=[
+                                {"label": " Nível de preço", "value": "nivel"},
+                                {
+                                    "label": " Variação homóloga (%)",
+                                    "value": "variacao",
+                                    "disabled": ANO_MAIS_RECENTE - 1 not in ANOS_DISPONIVEIS,
+                                },
+                            ],
+                            value="nivel",
+                            className="modo-mapa",
+                            inline=True,
+                        ),
+                    ],
+                    className="cabecalho-mapa",
+                ),
                 dcc.Graph(id="grafico-mapa", config={"displayModeBar": False}),
             ],
             className="cartao-grafico cartao-mapa",
@@ -379,8 +549,8 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     [
-                        html.H2("Evolução do índice nacional de vendas (desde 2009)"),
-                        dcc.Graph(figure=_linha_evolucao_nacional(), config={"displayModeBar": False}),
+                        html.H2("Evolução do índice nacional (desde 2009)"),
+                        dcc.Graph(id="grafico-indice", config={"displayModeBar": False}),
                     ],
                     className="cartao-grafico",
                 ),
@@ -398,6 +568,51 @@ app.layout = html.Div(
     ],
     className="pagina",
 )
+
+
+app.clientside_callback(
+    """
+    function(tema) {
+        document.documentElement.setAttribute('data-theme', tema === 'escuro' ? 'dark' : 'light');
+        return '';
+    }
+    """,
+    Output("tema-dummy", "children"),
+    Input("tema-armazenado", "data"),
+)
+
+app.clientside_callback(
+    """
+    function(n_clicks, tema_atual) {
+        if (!n_clicks) { return window.dash_clientside.no_update; }
+        return tema_atual === 'escuro' ? 'claro' : 'escuro';
+    }
+    """,
+    Output("tema-armazenado", "data"),
+    Input("botao-tema", "n_clicks"),
+    State("tema-armazenado", "data"),
+)
+
+
+@app.callback(Output("botao-tema", "children"), Input("tema-armazenado", "data"))
+def _atualizar_texto_botao_tema(tema):
+    return "☀️ Modo claro" if tema == "escuro" else "🌙 Modo escuro"
+
+
+@app.callback(
+    Output("filtro-modo-mapa", "options"),
+    Output("filtro-modo-mapa", "value"),
+    Input("filtro-ano", "value"),
+    State("filtro-modo-mapa", "value"),
+)
+def _atualizar_opcoes_modo_mapa(ano, modo_atual):
+    tem_ano_anterior = (ano - 1) in ANOS_DISPONIVEIS
+    opcoes = [
+        {"label": " Nível de preço", "value": "nivel"},
+        {"label": " Variação homóloga (%)", "value": "variacao", "disabled": not tem_ano_anterior},
+    ]
+    novo_modo = modo_atual if (modo_atual == "nivel" or tem_ano_anterior) else "nivel"
+    return opcoes, novo_modo
 
 
 @app.callback(Output("kpis", "children"), Input("filtro-tipo", "value"), Input("filtro-ano", "value"))
@@ -445,9 +660,10 @@ def _atualizar_kpis(tipo, ano):
     Input("filtro-nivel", "value"),
     Input("filtro-ano", "value"),
     Input("filtro-quartil", "value"),
+    Input("tema-armazenado", "data"),
 )
-def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil):
-    return _barras_comparacao(tipo, nivel, ano, quartil)
+def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil, tema):
+    return _barras_comparacao(tipo, nivel, ano, quartil, tema)
 
 
 @app.callback(
@@ -455,9 +671,16 @@ def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil):
     Input("filtro-tipo", "value"),
     Input("filtro-ano", "value"),
     Input("filtro-quartil", "value"),
+    Input("filtro-modo-mapa", "value"),
+    Input("tema-armazenado", "data"),
 )
-def _atualizar_mapa(tipo, ano, quartil):
-    return _mapa_concelhos(tipo, ano, quartil)
+def _atualizar_mapa(tipo, ano, quartil, modo, tema):
+    return _mapa_concelhos(tipo, ano, quartil, tema, modo)
+
+
+@app.callback(Output("grafico-indice", "figure"), Input("tema-armazenado", "data"))
+def _atualizar_grafico_indice(tema):
+    return _linha_evolucao_nacional(tema)
 
 
 @app.callback(

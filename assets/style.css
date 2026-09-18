@@ -2,11 +2,53 @@
   box-sizing: border-box;
 }
 
+:root {
+  color-scheme: light;
+  --fundo: #f9f9f7;
+  --cartao: #ffffff;
+  --borda: #e4e2dd;
+  --texto: #2b2b28;
+  --texto-suave: #6b6a65;
+  --destaque: #2f6f4f;
+  --destaque-suave: #e5f0ea;
+  --destaque-texto: #ffffff;
+  --sombra: rgba(11, 11, 11, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --fundo: #0d0d0d;
+    --cartao: #1a1a19;
+    --borda: #2c2c2a;
+    --texto: #f2f2f0;
+    --texto-suave: #c3c2b7;
+    --destaque: #45a06e;
+    --destaque-suave: rgba(69, 160, 110, 0.16);
+    --destaque-texto: #0d0d0d;
+    --sombra: rgba(0, 0, 0, 0.35);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --fundo: #0d0d0d;
+  --cartao: #1a1a19;
+  --borda: #2c2c2a;
+  --texto: #f2f2f0;
+  --texto-suave: #c3c2b7;
+  --destaque: #45a06e;
+  --destaque-suave: rgba(69, 160, 110, 0.16);
+  --destaque-texto: #0d0d0d;
+  --sombra: rgba(0, 0, 0, 0.35);
+}
+
 body {
   margin: 0;
-  background: #f7f7f5;
-  color: #2b2b28;
+  background: var(--fundo);
+  color: var(--texto);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .pagina {
@@ -15,16 +57,41 @@ body {
   padding: 32px 20px 60px;
 }
 
+.cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .cabecalho h1 {
   font-size: 1.8rem;
   margin: 0 0 6px;
 }
 
 .subtitulo {
-  color: #6b6a65;
+  color: var(--texto-suave);
   max-width: 720px;
   line-height: 1.5;
   margin: 0 0 28px;
+}
+
+.botao-tema {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--cartao);
+  color: var(--texto);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.botao-tema:hover {
+  border-color: var(--destaque);
 }
 
 .kpis-linha {
@@ -35,15 +102,15 @@ body {
 }
 
 .kpi-cartao {
-  background: #ffffff;
-  border: 1px solid #e4e2dd;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
   border-radius: 10px;
   padding: 16px 18px;
 }
 
 .kpi-titulo {
   font-size: 0.8rem;
-  color: #6b6a65;
+  color: var(--texto-suave);
   margin-bottom: 6px;
 }
 
@@ -54,7 +121,7 @@ body {
 
 .kpi-nota {
   font-size: 0.8rem;
-  color: #2f6f4f;
+  color: var(--destaque);
   margin-top: 4px;
 }
 
@@ -68,8 +135,22 @@ body {
 .filtro label {
   display: block;
   font-size: 0.8rem;
-  color: #6b6a65;
+  color: var(--texto-suave);
   margin-bottom: 4px;
+}
+
+/* Dropdowns (dcc.Dropdown / react-select) no tema escuro */
+.filtro .Select-control,
+.filtro .dash-dropdown .Select-control {
+  background: var(--cartao);
+  border-color: var(--borda);
+}
+.filtro .Select-menu-outer,
+.filtro .Select-value-label,
+.filtro .Select-placeholder,
+.filtro input {
+  background: var(--cartao);
+  color: var(--texto);
 }
 
 .graficos-grelha {
@@ -85,8 +166,8 @@ body {
 }
 
 .cartao-grafico {
-  background: #ffffff;
-  border: 1px solid #e4e2dd;
+  background: var(--cartao);
+  border: 1px solid var(--borda);
   border-radius: 10px;
   padding: 16px 18px;
 }
@@ -100,39 +181,71 @@ body {
   margin-bottom: 20px;
 }
 
+.cabecalho-mapa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.cabecalho-mapa h2 {
+  margin: 0;
+}
+
+.modo-mapa {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  display: flex;
+  gap: 16px;
+}
+
+.modo-mapa label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.modo-mapa input[type="radio"] {
+  accent-color: var(--destaque);
+}
+
 .botao-download {
   width: 100%;
   padding: 9px 14px;
-  border: 1px solid #2f6f4f;
+  border: 1px solid var(--destaque);
   border-radius: 8px;
-  background: #2f6f4f;
-  color: #ffffff;
+  background: var(--destaque);
+  color: var(--destaque-texto);
   font-size: 0.85rem;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, opacity 0.15s ease;
 }
 
 .botao-download:hover {
-  background: #26593f;
+  opacity: 0.85;
 }
 
 .botao-download-excel {
-  background: #ffffff;
-  color: #2f6f4f;
+  background: var(--cartao);
+  color: var(--destaque);
 }
 
 .botao-download-excel:hover {
-  background: #e5f0ea;
+  background: var(--destaque-suave);
+  opacity: 1;
 }
 
 .rodape {
   margin-top: 40px;
   font-size: 0.8rem;
-  color: #6b6a65;
+  color: var(--texto-suave);
   text-align: center;
 }
 
 .rodape a {
-  color: #2f6f4f;
+  color: var(--destaque);
 }
