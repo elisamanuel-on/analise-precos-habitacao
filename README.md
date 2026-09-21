@@ -15,10 +15,19 @@ Nacional de Estatística) sobre o mercado de habitação em Portugal:
   a crise da dívida de 2011-2013 e a subida acentuada desde 2015).
 - **Mapa de Portugal por concelho**, com os 308 concelhos coloridos por
   preço/renda, para o ano/quartil selecionado — com dois modos: **nível de
-  preço** (absoluto) ou **variação homóloga (%)** face ao ano anterior
-  (escala divergente azul/vermelho).
+  preço** (gradiente sequencial vivo, amarelo→laranja→vermelho) ou
+  **variação homóloga (%)** face ao ano anterior (escala divergente
+  azul/vermelho).
 - **Índice nacional com as 3 séries do INE** (Total, Novos, Existentes),
   não só o total.
+- **Pesquisa de concelho**, clique num concelho do mapa, ou os dois: o mapa
+  dá zoom e mostra um pino no concelho escolhido, a barra correspondente no
+  gráfico de comparação fica destacada, e aparece um pequeno painel com o
+  nome, o valor atual e a variação homóloga desse concelho. Um botão
+  "Limpar seleção" repõe a vista nacional.
+- **Transições animadas** ao mudar de filtro (mapa, barras e índice) e
+  janelas de info (hover) com as cores do tema, em vez do estilo cinzento
+  por omissão do Plotly.
 - **Modo escuro**, com o botão no canto superior direito a guardar a
   preferência no navegador.
 - **Download dos dados filtrados**, em CSV (formato português, pronto a abrir
@@ -143,11 +152,16 @@ confirmam que o CSV/Excel descarregados ficam com as colunas certas e que o
 
 ## Cores e acessibilidade
 
-As cores seguem um método de "uma cor por papel" (sequencial para nível de
-preço, categórica de ordem fixa para as 3 séries do índice, divergente para
-a variação homóloga), com as combinações validadas para separação de cor em
-daltonismo e contraste em ambos os temas — ver
+As cores seguem um método de "uma cor por papel": sequencial vivo (rampa
+"YlOrRd" de 7 tons — amarelo→laranja→vermelho escuro, monótona em
+claridade, não uma "rainbow" arbitrária) para o nível de preço no mapa e nas
+barras destacadas, categórica de ordem fixa para as 3 séries do índice, e
+divergente para a variação homóloga — com as combinações validadas para
+separação de cor em daltonismo e contraste em ambos os temas, ver
 `node scripts/validate_palette.js` na skill `dataviz` usada para o desenho.
+O contorno dos concelhos no mapa usa sempre um cinzento neutro (não a cor de
+fundo), para o tom mais claro da rampa não "desaparecer" contra um fundo
+quase branco no tema claro.
 O tema escuro usa um verde mais claro (`#45a06e`) do que o da marca
 (`#2f6f4f`), que só dá 2,9:1 de contraste sobre o fundo escuro; o mais claro
 dá 5,4:1.

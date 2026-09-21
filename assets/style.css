@@ -94,6 +94,21 @@ body {
   border-color: var(--destaque);
 }
 
+.botao-tema:disabled,
+.botao-limpar-selecao:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.botao-tema:disabled:hover,
+.botao-limpar-selecao:disabled:hover {
+  border-color: var(--borda);
+}
+
+.botao-limpar-selecao {
+  width: 100%;
+}
+
 .kpis-linha {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -201,6 +216,22 @@ body {
 .filtro .Select-noresults {
   background-color: var(--cartao) !important;
   color: var(--texto-suave) !important;
+}
+
+/* Painel do concelho em foco (pesquisado ou clicado no mapa) — reaproveita
+   o estilo dos cartões de KPI, só com uma borda à esquerda a assinalar que é
+   uma seleção. Fica invisível (:empty) quando nenhum concelho está
+   selecionado, em vez de aparecer como uma caixa vazia. */
+.painel-concelho:empty {
+  display: none;
+}
+
+.painel-concelho {
+  margin-bottom: 20px;
+}
+
+.painel-concelho .kpi-cartao {
+  border-left: 3px solid var(--destaque);
 }
 
 .graficos-grelha {

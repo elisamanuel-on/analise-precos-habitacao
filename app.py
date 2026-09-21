@@ -20,7 +20,7 @@ import os
 import dash
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output, State, dcc, html
+from dash import Input, Output, State, ctx, dcc, html
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -36,6 +36,83 @@ with open(os.path.join(PASTA_DADOS, "concelhos.geojson"), encoding="utf-8") as f
     import json
 
     GEOJSON_CONCELHOS = json.load(f)
+
+
+# --- Localização e nomes por concelho (pesquisa, clique no mapa, zoom) -----
+def _centroide_de_anel(anel: list) -> tuple:
+    """
+    Centroide de um anel de coordenadas [lon, lat] (fórmula da área de um
+    polígono). Se o anel for degenerado (área ~0, ex.: só 2-3 pontos em linha)
+    usa a média simples das coordenadas como reserva.
+    """
+    area2 = 0.0
+    cx = 0.0
+    cy = 0.0
+    for i in range(len(anel) - 1):
+        x0, y0 = anel[i][0], anel[i][1]
+        x1, y1 = anel[i + 1][0], anel[i + 1][1]
+        cruz = x0 * y1 - x1 * y0
+        area2 += cruz
+        cx += (x0 + x1) * cruz
+        cy += (y0 + y1) * cruz
+    if abs(area2) < 1e-12:
+        lons = [ponto[0] for ponto in anel]
+        lats = [ponto[1] for ponto in anel]
+        return (sum(lons) / len(lons), sum(lats) / len(lats))
+    area = area2 / 2.0
+    return (cx / (6.0 * area), cy / (6.0 * area))
+
+
+def _maior_anel_exterior(geometria: dict):
+    """Anel exterior do maior polígono de uma geometria Polygon/MultiPolygon."""
+    tipo = geometria.get("type")
+    if tipo == "Polygon":
+        aneis = [geometria["coordinates"][0]]
+    elif tipo == "MultiPolygon":
+        aneis = [poligono[0] for poligono in geometria["coordinates"]]
+    else:
+        aneis = []
+    if not aneis:
+        return None
+
+    def _area_aprox(anel):
+        return abs(sum(anel[i][0] * anel[i + 1][1] - anel[i + 1][0] * anel[i][1] for i in range(len(anel) - 1)))
+
+    return max(aneis, key=_area_aprox)
+
+
+def _centroide(geometria: dict):
+    """Centroide aproximado (lon, lat) de uma geometria GeoJSON Polygon/MultiPolygon."""
+    anel = _maior_anel_exterior(geometria)
+    if not anel or len(anel) < 3:
+        return None
+    return _centroide_de_anel(anel)
+
+
+CENTROIDE_POR_CON_CODE = {}
+for _feature in GEOJSON_CONCELHOS["features"]:
+    _con_code = _feature.get("properties", {}).get("con_code")
+    _centro = _centroide(_feature["geometry"])
+    if _con_code and _centro:
+        CENTROIDE_POR_CON_CODE[_con_code] = _centro
+
+_concelhos_base = df_vendas[df_vendas["nivel"] == "Concelho"][["geocod", "regiao"]].drop_duplicates("geocod")
+NOME_POR_GEOCOD = dict(zip(_concelhos_base["geocod"], _concelhos_base["regiao"], strict=True))
+CON_CODE_POR_GEOCOD = dict(zip(df_crosswalk["geocod"], df_crosswalk["con_code"], strict=True))
+GEOCOD_POR_CON_CODE = {con_code: geocod for geocod, con_code in CON_CODE_POR_GEOCOD.items()}
+CENTROIDE_POR_GEOCOD = {
+    geocod: CENTROIDE_POR_CON_CODE[con_code]
+    for geocod, con_code in CON_CODE_POR_GEOCOD.items()
+    if con_code in CENTROIDE_POR_CON_CODE
+}
+CONCELHOS_PESQUISA = sorted(
+    (
+        {"label": nome, "value": geocod}
+        for geocod, nome in NOME_POR_GEOCOD.items()
+        if geocod in CENTROIDE_POR_GEOCOD
+    ),
+    key=lambda opcao: opcao["label"],
+)
 
 # --- Configuração dos dois tipos de dado (venda / arrendamento) ---
 TIPOS = {
@@ -108,6 +185,24 @@ CORES_DIVERGENTE = {
     "claro": {"negativo": "#2a78d6", "neutro": "#f0efec", "positivo": "#e34948"},
     "escuro": {"negativo": "#3987e5", "neutro": "#383835", "positivo": "#e66767"},
 }
+
+
+# Sequencial vivo (nível de preço, no mapa) — rampa "YlOrRd" (ColorBrewer) de
+# 7 tons: mais viva do que um único tom da marca, mas continua monótona em
+# claridade (amarelo -> laranja -> vermelho escuro), por isso não é uma
+# "rainbow" arbitrária — mantém a leitura de "quanto mais escuro/vermelho,
+# mais caro". A mesma rampa serve os dois temas: quem muda entre claro/escuro
+# é o próprio estilo do mapa base ("carto-positron"/"carto-darkmatter"), e
+# estes tons quentes ficam bem visíveis sobre os dois.
+RAMPA_NIVEL_VIVIDA = [
+    [0.0, "#ffffb2"],
+    [0.16, "#fed976"],
+    [0.33, "#feb24c"],
+    [0.50, "#fd8d3c"],
+    [0.66, "#fc4e2a"],
+    [0.83, "#e31a1c"],
+    [1.0, "#b10026"],
+]
 
 
 def _cores(tema: str) -> dict:
@@ -216,6 +311,8 @@ def _linha_evolucao_nacional(tema: str = "claro") -> go.Figure:
             spikethickness=1,
         ),
         yaxis=dict(showgrid=True, gridcolor=cores["borda"], title="Índice (Base 2015 = 100)"),
+        hoverlabel=dict(bgcolor=cores["cartao"], font=dict(color=cores["texto"]), bordercolor=cores["borda"]),
+        transition=dict(duration=400, easing="cubic-in-out"),
     )
     return fig
 
@@ -281,7 +378,9 @@ def _gerar_excel(df: pd.DataFrame, coluna_valor: str, formato_numero: str) -> by
     return buffer.getvalue()
 
 
-def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str, tema: str = "claro") -> go.Figure:
+def _barras_comparacao(
+    tipo: str, nivel: str, ano: int, quartil: str, tema: str = "claro", foco_geocod=None
+) -> go.Figure:
     cfg = TIPOS[tipo]
     coluna = cfg["coluna"]
     cores = _cores(tema)
@@ -291,13 +390,23 @@ def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str, tema: str 
     if nivel == "Concelho" and len(df) > 25:
         df = df.sort_values(coluna, ascending=False).head(25).sort_values(coluna, ascending=True)
 
+    # Cor sólida da marca, como sempre — só ganha um contorno quando o
+    # concelho em foco (pesquisado/clicado no mapa) está entre as barras
+    # visíveis, para o destacar sem mudar a codificação de cor do gráfico.
+    marker = dict(color=cores["destaque"])
+    if foco_geocod is not None and "geocod" in df.columns and (df["geocod"] == foco_geocod).any():
+        marker["line"] = dict(
+            color=[cores["texto"] if g == foco_geocod else "rgba(0,0,0,0)" for g in df["geocod"]],
+            width=[2.5 if g == foco_geocod else 0 for g in df["geocod"]],
+        )
+
     fig = go.Figure()
     fig.add_trace(
         go.Bar(
             x=df[coluna],
             y=df["regiao"],
             orientation="h",
-            marker_color=cores["destaque"],
+            marker=marker,
             hovertemplate="%{y}<br>%{x:" + cfg["formato_hover"] + "} " + cfg["unidade"] + "<extra></extra>",
         )
     )
@@ -310,6 +419,8 @@ def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str, tema: str 
         font=dict(color=cores["texto"], family="system-ui, sans-serif"),
         xaxis=dict(showgrid=True, gridcolor=cores["borda"], title=cfg["unidade_eixo"]),
         yaxis=dict(showgrid=False),
+        hoverlabel=dict(bgcolor=cores["cartao"], font=dict(color=cores["texto"]), bordercolor=cores["borda"]),
+        transition=dict(duration=500, easing="cubic-in-out"),
     )
     return fig
 
@@ -335,7 +446,9 @@ def _variacao_por_concelho(tipo: str, ano: int, quartil: str) -> pd.DataFrame:
     return fundido[["geocod", "regiao", "variacao_pct"]]
 
 
-def _mapa_concelhos(tipo: str, ano: int, quartil: str, tema: str = "claro", modo: str = "nivel") -> go.Figure:
+def _mapa_concelhos(
+    tipo: str, ano: int, quartil: str, tema: str = "claro", modo: str = "nivel", foco_geocod=None
+) -> go.Figure:
     cfg = TIPOS[tipo]
     cores = _cores(tema)
 
@@ -394,22 +507,46 @@ def _mapa_concelhos(tipo: str, ano: int, quartil: str, tema: str = "claro", modo
                 locations=df["con_code"],
                 z=df[coluna],
                 featureidkey="properties.con_code",
-                colorscale=[[0, cores["destaque_suave"]], [1, cores["destaque"]]],
+                colorscale=RAMPA_NIVEL_VIVIDA,
                 marker_line_width=0.3,
-                marker_line_color=cores["cartao"],
+                # Contorno num cinzento neutro (não a cor de fundo): o tom mais
+                # claro da rampa viva (#ffffb2) fica quase invisível sobre um
+                # fundo quase branco — sem um contorno que se distinga da
+                # rampa, os concelhos de valor mais baixo "desapareciam" no
+                # tema claro.
+                marker_line_color=cores["borda"],
                 colorbar=dict(title=cfg["unidade"], thickness=14, len=0.8),
                 text=df["regiao"],
                 hovertemplate="%{text}<br>%{z:" + cfg["formato_hover"] + "} " + cfg["unidade"] + "<extra></extra>",
             )
         )
 
+    centro = {"lat": 39.6, "lon": -8.2}
+    zoom = 5.0
+    if foco_geocod is not None and foco_geocod in CENTROIDE_POR_GEOCOD:
+        lon_foco, lat_foco = CENTROIDE_POR_GEOCOD[foco_geocod]
+        centro = {"lat": lat_foco, "lon": lon_foco}
+        zoom = 9.5
+        fig.add_trace(
+            go.Scattermap(
+                lat=[lat_foco],
+                lon=[lon_foco],
+                mode="markers",
+                marker=dict(size=18, color=cores["texto"]),
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+
     fig.update_layout(
         map_style="carto-positron" if tema == "claro" else "carto-darkmatter",
-        map_zoom=5.0,
-        map_center={"lat": 39.6, "lon": -8.2},
+        map_zoom=zoom,
+        map_center=centro,
         margin=dict(l=0, r=0, t=0, b=0),
         height=440,
         paper_bgcolor=cores["cartao"],
+        hoverlabel=dict(bgcolor=cores["cartao"], font=dict(color=cores["texto"]), bordercolor=cores["borda"]),
+        transition=dict(duration=500, easing="cubic-in-out"),
     )
     return fig
 
@@ -455,6 +592,7 @@ app.index_string = """<!DOCTYPE html>
 app.layout = html.Div(
     [
         dcc.Store(id="tema-armazenado", storage_type="local", data="claro"),
+        dcc.Store(id="concelho-selecionado", data=None),
         html.Div(id="tema-dummy", style={"display": "none"}),
         html.Div(
             [
@@ -526,6 +664,32 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     [
+                        html.Label("Pesquisar concelho"),
+                        dcc.Dropdown(
+                            id="pesquisa-concelho",
+                            options=CONCELHOS_PESQUISA,
+                            value=None,
+                            placeholder="ex.: Sintra",
+                            clearable=True,
+                            searchable=True,
+                        ),
+                    ],
+                    className="filtro",
+                ),
+                html.Div(
+                    [
+                        html.Label(" "),
+                        html.Button(
+                            "✕ Limpar seleção",
+                            id="botao-limpar-selecao",
+                            className="botao-tema botao-limpar-selecao",
+                            disabled=True,
+                        ),
+                    ],
+                    className="filtro",
+                ),
+                html.Div(
+                    [
                         html.Label(" "),
                         html.Button("⬇ Descarregar CSV", id="botao-download", className="botao-download"),
                         dcc.Download(id="download-dados"),
@@ -547,6 +711,7 @@ app.layout = html.Div(
             ],
             className="filtros-linha",
         ),
+        html.Div(id="painel-concelho", className="painel-concelho"),
         html.Div(
             [
                 html.Div(
@@ -696,9 +861,10 @@ def _atualizar_kpis(tipo, ano):
     Input("filtro-ano", "value"),
     Input("filtro-quartil", "value"),
     Input("tema-armazenado", "data"),
+    Input("concelho-selecionado", "data"),
 )
-def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil, tema):
-    return _barras_comparacao(tipo, nivel, ano, quartil, tema)
+def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil, tema, foco_geocod):
+    return _barras_comparacao(tipo, nivel, ano, quartil, tema, foco_geocod)
 
 
 @app.callback(
@@ -708,9 +874,79 @@ def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil, tema):
     Input("filtro-quartil", "value"),
     Input("filtro-modo-mapa", "value"),
     Input("tema-armazenado", "data"),
+    Input("concelho-selecionado", "data"),
 )
-def _atualizar_mapa(tipo, ano, quartil, modo, tema):
-    return _mapa_concelhos(tipo, ano, quartil, tema, modo)
+def _atualizar_mapa(tipo, ano, quartil, modo, tema, foco_geocod):
+    return _mapa_concelhos(tipo, ano, quartil, tema, modo, foco_geocod)
+
+
+@app.callback(
+    Output("concelho-selecionado", "data"),
+    Output("pesquisa-concelho", "value"),
+    Input("pesquisa-concelho", "value"),
+    Input("grafico-mapa", "clickData"),
+    Input("botao-limpar-selecao", "n_clicks"),
+    prevent_initial_call=True,
+)
+def _atualizar_concelho_selecionado(geocod_pesquisa, click_data, _n_clicks_limpar):
+    """
+    Três origens podem mudar o concelho em foco — a caixa de pesquisa, um
+    clique no mapa ou o botão "Limpar seleção" — mas só há um sítio (a Store
+    "concelho-selecionado") a guardar isso, por isso é um único callback com
+    "ctx.triggered_id" a decidir qual delas disparou, em vez de três
+    callbacks a competir pelo mesmo Output (o Dash não permite isso).
+    """
+    origem = ctx.triggered_id
+    if origem == "botao-limpar-selecao":
+        return None, None
+    if origem == "grafico-mapa":
+        if not click_data:
+            return dash.no_update, dash.no_update
+        con_code = click_data["points"][0].get("location")
+        geocod = GEOCOD_POR_CON_CODE.get(con_code)
+        if geocod is None:
+            return dash.no_update, dash.no_update
+        return geocod, geocod
+    # origem == "pesquisa-concelho"
+    return geocod_pesquisa, geocod_pesquisa
+
+
+@app.callback(Output("botao-limpar-selecao", "disabled"), Input("concelho-selecionado", "data"))
+def _atualizar_estado_botao_limpar(geocod):
+    return geocod is None
+
+
+@app.callback(
+    Output("painel-concelho", "children"),
+    Input("concelho-selecionado", "data"),
+    Input("filtro-tipo", "value"),
+    Input("filtro-ano", "value"),
+    Input("filtro-quartil", "value"),
+)
+def _atualizar_painel_concelho(geocod, tipo, ano, quartil):
+    if not geocod:
+        return []
+
+    nome = NOME_POR_GEOCOD.get(geocod, str(geocod))
+    cfg = TIPOS[tipo]
+    df = cfg["df"]
+    linha = df[(df["geocod"] == geocod) & (df["ano"] == ano) & (df["quartil"] == quartil) & (df["nivel"] == "Concelho")]
+    valor_texto = (
+        cfg["formato_curto"].format(linha[cfg["coluna"]].iloc[0]) + f" {cfg['unidade']}"
+        if not linha.empty
+        else "Sem dados para este filtro"
+    )
+
+    nota_variacao = ""
+    df_var = _variacao_por_concelho(tipo, ano, quartil)
+    if not df_var.empty:
+        linha_var = df_var[df_var["geocod"] == geocod]
+        if not linha_var.empty:
+            variacao = linha_var["variacao_pct"].iloc[0]
+            sinal = "+" if variacao >= 0 else ""
+            nota_variacao = f"{sinal}{variacao:.1f}% desde {ano - 1}"
+
+    return [_cartao_kpi(f"📍 {nome}", valor_texto, nota_variacao)]
 
 
 @app.callback(Output("grafico-indice", "figure"), Input("tema-armazenado", "data"))
