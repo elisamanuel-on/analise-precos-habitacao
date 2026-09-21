@@ -2,6 +2,10 @@
   box-sizing: border-box;
 }
 
+/* Tema único, claro e colorido — sem alternância dark/light. As duas cores
+   de acento ("quente"/"frio") vêm da mesma família do gradiente do mapa (ver
+   app.py, RAMPA_NIVEL_VIVIDA e CORES), para o resto do dashboard falar a
+   mesma linguagem visual do mapa em vez de parecer um sistema à parte. */
 :root {
   color-scheme: light;
   --fundo: #f9f9f7;
@@ -9,38 +13,11 @@
   --borda: #e4e2dd;
   --texto: #2b2b28;
   --texto-suave: #6b6a65;
-  --destaque: #2f6f4f;
-  --destaque-suave: #e5f0ea;
-  --destaque-texto: #ffffff;
+  --quente: #b10026;
+  --quente-suave: #fbe4e6;
+  --frio: #1f5fae;
+  --frio-suave: #e6eef8;
   --sombra: rgba(11, 11, 11, 0.06);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-    --fundo: #0d0d0d;
-    --cartao: #1a1a19;
-    --borda: #2c2c2a;
-    --texto: #f2f2f0;
-    --texto-suave: #c3c2b7;
-    --destaque: #45a06e;
-    --destaque-suave: rgba(69, 160, 110, 0.16);
-    --destaque-texto: #0d0d0d;
-    --sombra: rgba(0, 0, 0, 0.35);
-  }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --fundo: #0d0d0d;
-  --cartao: #1a1a19;
-  --borda: #2c2c2a;
-  --texto: #f2f2f0;
-  --texto-suave: #c3c2b7;
-  --destaque: #45a06e;
-  --destaque-suave: rgba(69, 160, 110, 0.16);
-  --destaque-texto: #0d0d0d;
-  --sombra: rgba(0, 0, 0, 0.35);
 }
 
 body {
@@ -48,7 +25,6 @@ body {
   background: var(--fundo);
   color: var(--texto);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .pagina {
@@ -76,7 +52,7 @@ body {
   margin: 0 0 28px;
 }
 
-.botao-tema {
+.botao-neutro {
   flex: 0 0 auto;
   padding: 8px 14px;
   border: 1px solid var(--borda);
@@ -90,18 +66,16 @@ body {
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.botao-tema:hover {
-  border-color: var(--destaque);
+.botao-neutro:hover {
+  border-color: var(--quente);
 }
 
-.botao-tema:disabled,
-.botao-limpar-selecao:disabled {
+.botao-neutro:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.botao-tema:disabled:hover,
-.botao-limpar-selecao:disabled:hover {
+.botao-neutro:disabled:hover {
   border-color: var(--borda);
 }
 
@@ -123,6 +97,18 @@ body {
   padding: 16px 18px;
 }
 
+/* Os cartões "concelho mais caro" e "concelho mais acessível" ganham uma
+   borda à esquerda na cor correspondente (quente/fria), a mesma lógica de
+   "quanto mais caro, mais quente" do mapa — em vez de todos os cartões
+   usarem sempre a mesma cor de destaque, como acontecia antes. */
+.kpi-cartao--quente {
+  border-left: 3px solid var(--quente);
+}
+
+.kpi-cartao--frio {
+  border-left: 3px solid var(--frio);
+}
+
 .kpi-titulo {
   font-size: 0.8rem;
   color: var(--texto-suave);
@@ -136,8 +122,16 @@ body {
 
 .kpi-nota {
   font-size: 0.8rem;
-  color: var(--destaque);
+  color: var(--texto-suave);
   margin-top: 4px;
+}
+
+.kpi-cartao--quente .kpi-nota {
+  color: var(--quente);
+}
+
+.kpi-cartao--frio .kpi-nota {
+  color: var(--frio);
 }
 
 .filtros-linha {
@@ -154,84 +148,76 @@ body {
   margin-bottom: 4px;
 }
 
-/* Dropdowns (dcc.Dropdown / react-select): a folha de estilo interna do Dash
-   carrega depois de assets/style.css e usa as mesmas classes com a mesma
-   especificidade, por isso ganha por ordem — só o !important garante que
-   o tema escuro também se aplica aqui. */
-.filtro .Select-control {
+/* Dropdowns (dcc.Dropdown): a versão do Dash usada neste projeto já não usa
+   o antigo "react-select" (classes .Select-control, .Select-menu, ...) — foi
+   substituído por um componente novo com outras classes (.dash-dropdown-*).
+   As regras antigas deste ficheiro tinham deixado de corresponder a nada
+   (por isso o texto ficava ilegível: sem estas regras, o dropdown herdava a
+   cor de texto do body e mostrava sempre um fundo branco próprio, e nada
+   garantia que os dois combinassem). Confirmado por inspeção direta da
+   página com Playwright antes de escrever isto — ver commit correspondente.
+   A folha de estilo interna do Dash carrega depois de assets/style.css e
+   usa as mesmas classes com a mesma especificidade, por isso ganha por
+   ordem — o !important garante que as nossas cores se aplicam por cima. */
+.filtro .dash-dropdown {
   background-color: var(--cartao) !important;
   border-color: var(--borda) !important;
-}
-/* Wildcard: cobre o texto do valor selecionado seja qual for a subclasse
-   exata que o Dash usar por baixo de .Select-control (varia ligeiramente
-   entre versões) — mais seguro do que apostar num nome de classe só. */
-.filtro .Select-control,
-.filtro .Select-control * {
   color: var(--texto) !important;
 }
-.filtro .Select-placeholder,
-.filtro .Select-input input::placeholder {
+.filtro .dash-dropdown-value-item,
+.filtro .dash-dropdown-value-item * {
+  color: var(--texto) !important;
+}
+.filtro .dash-dropdown-placeholder {
   color: var(--texto-suave) !important;
 }
-.filtro .Select-arrow {
-  border-color: var(--texto-suave) transparent transparent !important;
+/* Os ícones (seta, lupa) são SVGs com fill="currentColor" — basta definir
+   "color" no elemento à volta para os tingir, sem precisar de tocar no SVG. */
+.filtro .dash-dropdown-trigger-icon,
+.filtro .dash-dropdown-search-icon {
+  color: var(--texto-suave) !important;
 }
-/* "is-open" fica no wrapper .Select, não em .filtro — tem de ser descendente,
-   não composto (".filtro.is-open" nunca combinava com nada). */
-.filtro .is-open .Select-arrow {
-  border-color: transparent transparent var(--texto-suave) !important;
+.filtro .dash-dropdown-content {
+  background-color: var(--cartao) !important;
+  border: 1px solid var(--borda) !important;
+  color: var(--texto) !important;
+}
+.filtro .dash-dropdown-option,
+.filtro .dash-dropdown-option * {
+  background-color: var(--cartao) !important;
+  color: var(--texto) !important;
+}
+.filtro .dash-dropdown-option.selected,
+.filtro .dash-dropdown-option.selected *,
+.filtro .dash-dropdown-option:hover,
+.filtro .dash-dropdown-option:hover *,
+.filtro .dash-dropdown-option[aria-selected="true"],
+.filtro .dash-dropdown-option[aria-selected="true"] * {
+  background-color: var(--quente-suave) !important;
+  color: var(--texto) !important;
 }
 /* O campo de pesquisa que aparece ao abrir o dropdown herda a aparência
    nativa do sistema operativo (caixa branca arredondada com lupa) — sem
    "appearance: none" o fundo/cor definidos acima não têm efeito nele. */
-.filtro input {
+.filtro .dash-dropdown-search {
   -webkit-appearance: none !important;
   appearance: none !important;
   background: transparent !important;
   color: var(--texto) !important;
   border: none !important;
   box-shadow: none !important;
-  border-radius: 0 !important;
-}
-.filtro .is-open .Select-control {
-  background-color: var(--cartao) !important;
-}
-.filtro .Select-menu-outer,
-.filtro .Select-menu {
-  background-color: var(--cartao) !important;
-  border-color: var(--borda) !important;
-}
-.filtro .Select-option,
-.filtro .Select-option * {
-  background-color: var(--cartao) !important;
-  color: var(--texto) !important;
-}
-.filtro .Select-option.is-focused,
-.filtro .Select-option.is-focused *,
-.filtro .Select-option.is-selected,
-.filtro .Select-option.is-selected * {
-  background-color: var(--destaque-suave) !important;
-  color: var(--texto) !important;
-}
-.filtro .Select-noresults {
-  background-color: var(--cartao) !important;
-  color: var(--texto-suave) !important;
 }
 
-/* Painel do concelho em foco (pesquisado ou clicado no mapa) — reaproveita
-   o estilo dos cartões de KPI, só com uma borda à esquerda a assinalar que é
-   uma seleção. Fica invisível (:empty) quando nenhum concelho está
-   selecionado, em vez de aparecer como uma caixa vazia. */
+/* Painel do concelho em foco (pesquisado ou clicado no mapa) — é um cartão
+   de KPI normal (já com a borda "quente" de _cartao_kpi(tom="quente")), só
+   precisa do espaçamento por fora. Fica invisível (:empty) quando nenhum
+   concelho está selecionado, em vez de aparecer como uma caixa vazia. */
 .painel-concelho:empty {
   display: none;
 }
 
 .painel-concelho {
   margin-bottom: 20px;
-}
-
-.painel-concelho .kpi-cartao {
-  border-left: 3px solid var(--destaque);
 }
 
 .graficos-grelha {
@@ -290,16 +276,16 @@ body {
 }
 
 .modo-mapa input[type="radio"] {
-  accent-color: var(--destaque);
+  accent-color: var(--quente);
 }
 
 .botao-download {
   width: 100%;
   padding: 9px 14px;
-  border: 1px solid var(--destaque);
+  border: 1px solid var(--quente);
   border-radius: 8px;
-  background: var(--destaque);
-  color: var(--destaque-texto);
+  background: var(--quente);
+  color: #ffffff;
   font-size: 0.85rem;
   font-family: inherit;
   cursor: pointer;
@@ -312,11 +298,11 @@ body {
 
 .botao-download-excel {
   background: var(--cartao);
-  color: var(--destaque);
+  color: var(--quente);
 }
 
 .botao-download-excel:hover {
-  background: var(--destaque-suave);
+  background: var(--quente-suave);
   opacity: 1;
 }
 
@@ -328,5 +314,5 @@ body {
 }
 
 .rodape a {
-  color: var(--destaque);
+  color: var(--quente);
 }

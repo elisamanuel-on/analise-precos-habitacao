@@ -28,8 +28,10 @@ Nacional de Estatística) sobre o mercado de habitação em Portugal:
 - **Transições animadas** ao mudar de filtro (mapa, barras e índice) e
   janelas de info (hover) com as cores do tema, em vez do estilo cinzento
   por omissão do Plotly.
-- **Modo escuro**, com o botão no canto superior direito a guardar a
-  preferência no navegador.
+- **Tradução automática (PT/EN)**: a página deteta o idioma do browser de
+  quem visita (cabeçalho `Accept-Language`) e mostra tudo — títulos,
+  filtros, cartões, gráficos, ficheiros exportados — nesse idioma,
+  automaticamente, sem botão.
 - **Download dos dados filtrados**, em CSV (formato português, pronto a abrir
   no Excel) ou em Excel já formatado (cabeçalho, larguras de coluna, filtros
   e 1ª linha fixa).
@@ -152,19 +154,41 @@ confirmam que o CSV/Excel descarregados ficam com as colunas certas e que o
 
 ## Cores e acessibilidade
 
-As cores seguem um método de "uma cor por papel": sequencial vivo (rampa
-"YlOrRd" de 7 tons — amarelo→laranja→vermelho escuro, monótona em
-claridade, não uma "rainbow" arbitrária) para o nível de preço no mapa e nas
-barras destacadas, categórica de ordem fixa para as 3 séries do índice, e
-divergente para a variação homóloga — com as combinações validadas para
-separação de cor em daltonismo e contraste em ambos os temas, ver
-`node scripts/validate_palette.js` na skill `dataviz` usada para o desenho.
+Tema único, claro — sem alternância dark/light. As cores seguem um método de
+"uma cor por papel", com duas cores de acento tiradas da mesma família do
+gradiente do mapa em vez de um único verde neutro à parte: **quente**
+(`#b10026`, o tom mais forte da própria rampa do mapa) para os elementos de
+ação e os valores "altos" (concelho mais caro, seleção em foco, botões), e
+**fria** (`#1f5fae`) para os valores "baixos" (concelho mais acessível) e
+para o pino do concelho selecionado no mapa — escolhida por se distinguir de
+qualquer tom da rampa quente, seja qual for o valor do concelho por baixo.
+Isto faz o mapa e o resto do dashboard falarem a mesma linguagem visual, em
+vez de parecerem duas paletas diferentes.
+
+O nível de preço no mapa e nas barras usa a rampa sequencial "YlOrRd" (7
+tons, ColorBrewer) — amarelo→laranja→vermelho escuro, monótona em
+claridade, não uma "rainbow" arbitrária. O índice nacional mantém uma
+paleta categórica de ordem fixa (3 séries), e a variação homóloga usa uma
+escala divergente própria. Todas as combinações validadas para separação de
+cor em daltonismo e contraste — ver `node scripts/validate_palette.js` na
+skill `dataviz` usada para o desenho; as cores quente/fria dão 7,25:1 e
+6,35:1 de contraste sobre o fundo, acima do mínimo de 4,5:1 para texto.
 O contorno dos concelhos no mapa usa sempre um cinzento neutro (não a cor de
 fundo), para o tom mais claro da rampa não "desaparecer" contra um fundo
-quase branco no tema claro.
-O tema escuro usa um verde mais claro (`#45a06e`) do que o da marca
-(`#2f6f4f`), que só dá 2,9:1 de contraste sobre o fundo escuro; o mais claro
-dá 5,4:1.
+quase branco.
+
+## Idioma automático
+
+A app deteta o idioma preferido de quem visita a partir do cabeçalho HTTP
+`Accept-Language` que o próprio browser envia — sem JavaScript, sem cookie,
+sem botão. Tecnicamente, o `app.layout` do Dash é uma função em vez de um
+valor fixo (`app.layout = _layout`), o que faz o Dash chamá-la de novo a
+cada visita, com acesso ao pedido HTTP dessa pessoa via `flask.request`; o
+idioma detetado fica guardado numa `dcc.Store` e é passado a todos os
+callbacks que produzem texto (incluindo os nomes das colunas nos ficheiros
+CSV/Excel exportados). Só português e inglês são suportados por agora; os
+nomes de concelhos/regiões mantêm-se sempre em português nos dois idiomas,
+por serem nomes próprios.
 
 ## Notas de design
 
@@ -189,7 +213,8 @@ dá 5,4:1.
     (formato português), para abrir diretamente no Excel já dividido em
     colunas.
   - **Excel** (`.xlsx`, gerado com `openpyxl`): cabeçalho a negrito com fundo
-    verde, largura das colunas ajustada ao conteúdo, 1ª linha fixa ao scroll,
+    na cor de destaque do dashboard, largura das colunas ajustada ao
+    conteúdo, 1ª linha fixa ao scroll,
     filtros automáticos no cabeçalho e a coluna de valores com separador de
     milhares — pronto a apresentar ou a imprimir sem precisar de formatar
     nada à mão.

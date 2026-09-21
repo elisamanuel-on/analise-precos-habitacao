@@ -12,6 +12,12 @@ fonte E-REDES/OpenDataSoft — dados abertos, sem necessidade de chave) e um
 cruzamento de códigos (dados/concelhos_geojson_crosswalk.csv) para ligar cada
 concelho do INE à sua forma no mapa.
 
+O idioma da página (português/inglês) é detetado automaticamente a partir do
+cabeçalho "Accept-Language" que o browser de quem visita envia — sem botão,
+sem JavaScript: o "app.layout" é uma função (ver "_layout" mais abaixo), por
+isso o Dash chama-a de novo em cada visita, com acesso ao pedido HTTP dessa
+pessoa (via "flask.request").
+
 Corre localmente com: python app.py  (abre http://localhost:8050)
 """
 import io
@@ -21,10 +27,13 @@ import dash
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Input, Output, State, ctx, dcc, html
+from flask import request
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 PASTA_DADOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados")
+IDIOMAS_DISPONIVEIS = ["pt", "en"]
+IDIOMA_OMISSAO = "pt"
 
 # --- Dados (reais, lidos dos CSVs/GeoJSON gerados por scripts/atualizar_dados.py) ---
 df_vendas = pd.read_csv(os.path.join(PASTA_DADOS, "precos_regionais.csv"))
@@ -115,6 +124,8 @@ CONCELHOS_PESQUISA = sorted(
 )
 
 # --- Configuração dos dois tipos de dado (venda / arrendamento) ---
+# "rotulo_exportacao" saiu daqui — o cabeçalho da coluna exportada depende do
+# idioma de quem descarrega, por isso vem de TRADUCOES (ver mais abaixo).
 TIPOS = {
     "Venda": {
         "df": df_vendas,
@@ -123,7 +134,6 @@ TIPOS = {
         "unidade_eixo": "€ / m²",
         "formato_curto": "{:.0f}",
         "formato_hover": ".0f",
-        "rotulo_exportacao": "Preço (€/m²)",
         "formato_excel": "#,##0",
     },
     "Arrendamento": {
@@ -133,7 +143,6 @@ TIPOS = {
         "unidade_eixo": "€ / m² / mês",
         "formato_curto": "{:.2f}",
         "formato_hover": ".2f",
-        "rotulo_exportacao": "Renda (€/m²/mês)",
         "formato_excel": "#,##0.00",
     },
 }
@@ -146,54 +155,42 @@ NIVEIS_DISPONIVEIS = ["NUTS II", "NUTS III", "Concelho"]
 QUARTIS_DISPONIVEIS = sorted(df_vendas["quartil"].dropna().unique().tolist())
 QUARTIL_MEDIANA = "2.º quartil"
 
-# --- Cores: claro/escuro, seguindo o método "um valor por papel" -----------
-# Sequencial (nível de preço, no mapa e nas barras): um único tom (a cor da
-# marca), do mais claro ao mais escuro. Categórico (as 3 séries do índice
-# nacional): ordem fixa e validada (ΔE >= 8 entre todos os pares, em ambos os
-# temas — ver node scripts/validate_palette.js). Divergente (variação
-# homóloga, no mapa): dois polos + cinzento neutro no meio.
-CORES_CLARO = {
+# --- Cores: tema único, claro, com duas cores de acento tiradas da mesma
+# família do mapa (em vez de claro/escuro com um único verde neutro) --------
+# "quente" é literalmente o tom mais forte da rampa do mapa (RAMPA_NIVEL_VIVIDA,
+# mais abaixo) — usado nos elementos de ação e nos valores "altos" (concelho
+# mais caro, seleção em foco). "frio" é o complementar, usado nos valores
+# "baixos" (concelho mais acessível) e em qualquer marcador que precise de se
+# destacar sobre o próprio mapa colorido (por isso não podia ser um tom quente
+# como o resto do mapa). Ambos validados a >= 4.5:1 de contraste sobre o
+# fundo claro (ver node scripts/validate_palette.js, função contrast()).
+CORES = {
     "fundo": "#f9f9f7",
     "cartao": "#ffffff",
     "borda": "#e4e2dd",
     "texto": "#2b2b28",
     "texto_suave": "#6b6a65",
-    "destaque": "#2f6f4f",
-    "destaque_suave": "#e5f0ea",
-}
-CORES_ESCURO = {
-    "fundo": "#0d0d0d",
-    "cartao": "#1a1a19",
-    "borda": "#2c2c2a",
-    "texto": "#f2f2f0",
-    "texto_suave": "#c3c2b7",
-    # o verde da marca (#2f6f4f) só dá 2.9:1 sobre o fundo escuro (#1a1a19);
-    # este tom mais claro dá 5.4:1, mantendo a mesma família de cor.
-    "destaque": "#45a06e",
-    "destaque_suave": "rgba(69, 160, 110, 0.16)",
+    "quente": "#b10026",
+    "quente_suave": "#fbe4e6",
+    "frio": "#1f5fae",
+    "frio_suave": "#e6eef8",
 }
 
-# Categórico (índice nacional: Total / Novos / Existentes) — primeiras 3 cores
-# da paleta categórica validada (ordem fixa, nunca trocada entre séries).
-CORES_CATEGORICAS = {
-    "claro": ["#2a78d6", "#eb6834", "#1baf7a"],
-    "escuro": ["#3987e5", "#d95926", "#199e70"],
-}
+# Categórico (índice nacional: Total / Novos / Existentes) — ordem fixa e
+# validada (ΔE >= 8 entre todos os pares — ver node scripts/validate_palette.js).
+# Não muda com o resto da paleta: é uma codificação de identidade de série,
+# não uma cor de marca/UI.
+CORES_CATEGORICAS = ["#2a78d6", "#eb6834", "#1baf7a"]
 
 # Divergente (variação homóloga no mapa) — polos + cinzento neutro no meio.
-CORES_DIVERGENTE = {
-    "claro": {"negativo": "#2a78d6", "neutro": "#f0efec", "positivo": "#e34948"},
-    "escuro": {"negativo": "#3987e5", "neutro": "#383835", "positivo": "#e66767"},
-}
+CORES_DIVERGENTE = {"negativo": "#2a78d6", "neutro": "#f0efec", "positivo": "#e34948"}
 
-
-# Sequencial vivo (nível de preço, no mapa) — rampa "YlOrRd" (ColorBrewer) de
-# 7 tons: mais viva do que um único tom da marca, mas continua monótona em
-# claridade (amarelo -> laranja -> vermelho escuro), por isso não é uma
-# "rainbow" arbitrária — mantém a leitura de "quanto mais escuro/vermelho,
-# mais caro". A mesma rampa serve os dois temas: quem muda entre claro/escuro
-# é o próprio estilo do mapa base ("carto-positron"/"carto-darkmatter"), e
-# estes tons quentes ficam bem visíveis sobre os dois.
+# Sequencial vivo (nível de preço, no mapa e nas barras) — rampa "YlOrRd"
+# (ColorBrewer) de 7 tons: amarelo -> laranja -> vermelho escuro, monótona em
+# claridade (não é uma "rainbow" arbitrária). O tom mais forte desta rampa
+# ("#b10026") é também a cor "quente" da paleta da UI, para o mapa e o resto
+# do dashboard falarem a mesma linguagem visual em vez de parecerem dois
+# sistemas de cor diferentes.
 RAMPA_NIVEL_VIVIDA = [
     [0.0, "#ffffb2"],
     [0.16, "#fed976"],
@@ -205,8 +202,153 @@ RAMPA_NIVEL_VIVIDA = [
 ]
 
 
-def _cores(tema: str) -> dict:
-    return CORES_ESCURO if tema == "escuro" else CORES_CLARO
+# --- Traduções (português/inglês) -------------------------------------------
+TRADUCOES = {
+    "pt": {
+        "titulo": "Análise de Preços de Habitação em Portugal",
+        "subtitulo": (
+            "Dados reais e oficiais do INE (Instituto Nacional de Estatística): "
+            "vendas e arrendamento de alojamentos familiares por concelho, e a "
+            "evolução do índice de preços de venda da habitação desde 2009."
+        ),
+        "label_tipo": "Tipo",
+        "label_nivel": "Nível geográfico",
+        "label_ano": "Ano",
+        "label_quartil": "Quartil",
+        "label_pesquisa": "Pesquisar concelho",
+        "placeholder_pesquisa": "ex.: Sintra",
+        "botao_limpar_selecao": "✕ Limpar seleção",
+        "botao_csv": "⬇ Descarregar CSV",
+        "botao_excel": "📊 Descarregar Excel",
+        "tipo_venda": "Venda",
+        "tipo_arrendamento": "Arrendamento",
+        "nivel_concelho": "Concelho",
+        "titulo_mapa": "Mapa por concelho",
+        "modo_nivel": " Nível de preço",
+        "modo_variacao": " Variação homóloga (%)",
+        "titulo_comparacao": "Comparação entre regiões",
+        "titulo_indice": "Evolução do índice nacional (desde 2009)",
+        "eixo_indice": "Índice (Base 2015 = 100)",
+        "serie_total": "Total",
+        "serie_novos": "Novos",
+        "serie_existentes": "Existentes",
+        "kpi_nacional_venda": "Preço mediano nacional",
+        "kpi_nacional_arrendamento": "Renda mediana nacional",
+        "kpi_caro_venda": "Concelho mais caro",
+        "kpi_caro_arrendamento": "Concelho com renda mais alta",
+        "kpi_barato_venda": "Concelho mais acessível",
+        "kpi_barato_arrendamento": "Concelho com renda mais baixa",
+        "kpi_concelhos_titulo": "Concelhos analisados",
+        "kpi_concelhos_nota": "todo o país",
+        "nota_variacao": "{sinal}{valor:.1f}% desde {ano}",
+        "sem_dados_filtro": "Sem dados para este filtro",
+        "sem_dados_variacao": "Sem dados de {ano_anterior} para calcular a variação homóloga de {ano}.",
+        "hover_face_a": "face a",
+        "colorbar_variacao": "Variação (%)",
+        "col_regiao": "Região",
+        "col_nivel": "Nível geográfico",
+        "col_ano": "Ano",
+        "col_quartil": "Quartil",
+        "col_preco": "Preço (€/m²)",
+        "col_renda": "Renda (€/m²/mês)",
+        "rodape_fonte": "Fonte: ",
+        "rodape_ine": "INE — Instituto Nacional de Estatística",
+        "rodape_projeto": ". Projeto de portefólio de Elisama Manuel.",
+    },
+    "en": {
+        "titulo": "Housing Price Analysis in Portugal",
+        "subtitulo": (
+            "Real, official data from Statistics Portugal (INE): home sales and "
+            "rentals by municipality, and the evolution of the housing sale price "
+            "index since 2009."
+        ),
+        "label_tipo": "Type",
+        "label_nivel": "Geographic level",
+        "label_ano": "Year",
+        "label_quartil": "Quartile",
+        "label_pesquisa": "Search municipality",
+        "placeholder_pesquisa": "e.g. Sintra",
+        "botao_limpar_selecao": "✕ Clear selection",
+        "botao_csv": "⬇ Download CSV",
+        "botao_excel": "📊 Download Excel",
+        "tipo_venda": "Sale",
+        "tipo_arrendamento": "Rental",
+        "nivel_concelho": "Municipality",
+        "titulo_mapa": "Map by municipality",
+        "modo_nivel": " Price level",
+        "modo_variacao": " Year-over-year change (%)",
+        "titulo_comparacao": "Comparison between regions",
+        "titulo_indice": "National index evolution (since 2009)",
+        "eixo_indice": "Index (Base 2015 = 100)",
+        "serie_total": "Total",
+        "serie_novos": "New builds",
+        "serie_existentes": "Existing homes",
+        "kpi_nacional_venda": "National median price",
+        "kpi_nacional_arrendamento": "National median rent",
+        "kpi_caro_venda": "Most expensive municipality",
+        "kpi_caro_arrendamento": "Highest-rent municipality",
+        "kpi_barato_venda": "Most affordable municipality",
+        "kpi_barato_arrendamento": "Lowest-rent municipality",
+        "kpi_concelhos_titulo": "Municipalities analyzed",
+        "kpi_concelhos_nota": "whole country",
+        "nota_variacao": "{sinal}{valor:.1f}% since {ano}",
+        "sem_dados_filtro": "No data for this filter",
+        "sem_dados_variacao": "No {ano_anterior} data available to calculate the year-over-year change for {ano}.",
+        "hover_face_a": "vs.",
+        "colorbar_variacao": "Change (%)",
+        "col_regiao": "Region",
+        "col_nivel": "Geographic level",
+        "col_ano": "Year",
+        "col_quartil": "Quartile",
+        "col_preco": "Price (€/sqm)",
+        "col_renda": "Rent (€/sqm/month)",
+        "rodape_fonte": "Source: ",
+        "rodape_ine": "INE — Statistics Portugal",
+        "rodape_projeto": ". Portfolio project by Elisama Manuel.",
+    },
+}
+
+
+def _t(chave: str, idioma: str) -> str:
+    idioma = idioma if idioma in TRADUCOES else IDIOMA_OMISSAO
+    return TRADUCOES[idioma].get(chave, TRADUCOES[IDIOMA_OMISSAO][chave])
+
+
+def _idioma_do_pedido() -> str:
+    """
+    Deteta o idioma preferido de quem está a visitar, a partir do cabeçalho
+    HTTP "Accept-Language" que o próprio browser envia — sem qualquer
+    intervenção da pessoa (sem botão, sem JavaScript). Cai em português por
+    omissão se o cabeçalho não indicar uma preferência clara.
+    """
+    try:
+        return request.accept_languages.best_match(IDIOMAS_DISPONIVEIS) or IDIOMA_OMISSAO
+    except Exception:
+        return IDIOMA_OMISSAO
+
+
+def _rotulo_tipo(tipo: str, idioma: str) -> str:
+    return _t("tipo_venda" if tipo == "Venda" else "tipo_arrendamento", idioma)
+
+
+def _rotulo_nivel(nivel: str, idioma: str) -> str:
+    return _t("nivel_concelho", idioma) if nivel == "Concelho" else nivel
+
+
+def _rotulo_quartil(quartil: str, idioma: str) -> str:
+    """
+    O valor por trás do filtro (usado para filtrar os dados) fica sempre igual
+    ao texto que vem do CSV do INE ("1.º quartil", ...) — só o texto MOSTRADO
+    ao utilizador muda com o idioma.
+    """
+    if idioma != "en":
+        return quartil
+    try:
+        indice = QUARTIS_DISPONIVEIS.index(quartil) + 1
+    except ValueError:
+        return quartil
+    sufixos = {1: "1st", 2: "2nd", 3: "3rd"}
+    return f"{sufixos.get(indice, f'{indice}th')} quartile"
 
 
 def _kpis_para_ano(tipo: str, ano: int) -> dict:
@@ -242,51 +384,57 @@ def _kpis_para_ano(tipo: str, ano: int) -> dict:
     }
 
 
-def _cartao_kpi(titulo: str, valor: str, nota: str = "") -> html.Div:
+def _cartao_kpi(titulo: str, valor: str, nota: str = "", tom: str = "") -> html.Div:
     filhos = [html.Div(titulo, className="kpi-titulo"), html.Div(valor, className="kpi-valor")]
     if nota:
         filhos.append(html.Div(nota, className="kpi-nota"))
-    return html.Div(filhos, className="kpi-cartao")
+    classes = "kpi-cartao"
+    if tom:
+        classes += f" kpi-cartao--{tom}"
+    return html.Div(filhos, className=classes)
 
 
-def _linha_evolucao_nacional(tema: str = "claro") -> go.Figure:
+def _linha_evolucao_nacional(idioma: str = "pt") -> go.Figure:
     """
     Evolução do índice nacional de vendas desde 2009, com as 3 séries do INE
     (Total, Novos, Existentes) — cor categórica de ordem fixa, legenda,
     hover unificado com linha de referência (spike) e rótulo no fim de cada
-    linha (a "válvula de alívio" exigida quando uma das cores, no modo claro,
-    fica abaixo do contraste mínimo de 3:1 face à superfície).
+    linha (a "válvula de alívio" exigida quando uma das cores fica abaixo do
+    contraste mínimo de 3:1 face à superfície).
     """
-    cores = _cores(tema)
-    paleta = CORES_CATEGORICAS[tema]
     categorias = [
-        ("Total", paleta[0], True),
-        ("Novos", paleta[1], False),
-        ("Existentes", paleta[2], False),
+        ("Total", "serie_total", CORES_CATEGORICAS[0], True),
+        ("Novos", "serie_novos", CORES_CATEGORICAS[1], False),
+        ("Existentes", "serie_existentes", CORES_CATEGORICAS[2], False),
     ]
 
     fig = go.Figure()
-    for nome, cor, preencher in categorias:
-        df = df_indice[df_indice["categoria"] == nome].sort_values("periodo")
+    for nome_dados, chave_traducao, cor, preencher in categorias:
+        df = df_indice[df_indice["categoria"] == nome_dados].sort_values("periodo")
         if df.empty:
             continue
+        nome_exibido = _t(chave_traducao, idioma)
         kwargs = dict(
             x=df["periodo"],
             y=df["indice"],
             mode="lines",
-            name=nome,
-            line=dict(color=cor, width=2.5 if nome == "Total" else 1.75),
-            hovertemplate=f"{nome}: " + "%{y:.1f}<extra></extra>",
+            name=nome_exibido,
+            line=dict(color=cor, width=2.5 if nome_dados == "Total" else 1.75),
+            hovertemplate=f"{nome_exibido}: " + "%{y:.1f}<extra></extra>",
         )
         if preencher:
+            # A série "Total" tem a cor CORES_CATEGORICAS[0] (um azul) — o
+            # preenchimento usa o tom "frio" da paleta (também um azul) para
+            # os dois ficarem na mesma família, em vez do tom "quente" que
+            # não combinaria com esta linha.
             kwargs["fill"] = "tozeroy"
-            kwargs["fillcolor"] = cores["destaque_suave"]
+            kwargs["fillcolor"] = CORES["frio_suave"]
         fig.add_trace(go.Scatter(**kwargs))
         ultimo = df.iloc[-1]
         fig.add_annotation(
             x=ultimo["periodo"],
             y=ultimo["indice"],
-            text=f" {nome}",
+            text=f" {nome_exibido}",
             showarrow=False,
             xanchor="left",
             font=dict(color=cor, size=11),
@@ -295,9 +443,9 @@ def _linha_evolucao_nacional(tema: str = "claro") -> go.Figure:
     fig.update_layout(
         margin=dict(l=10, r=48, t=10, b=10),
         height=340,
-        plot_bgcolor=cores["cartao"],
-        paper_bgcolor=cores["cartao"],
-        font=dict(color=cores["texto"], family="system-ui, sans-serif"),
+        plot_bgcolor=CORES["cartao"],
+        paper_bgcolor=CORES["cartao"],
+        font=dict(color=CORES["texto"], family="system-ui, sans-serif"),
         hovermode="x unified",
         showlegend=False,  # os rótulos no fim de cada linha substituem a legenda
         xaxis=dict(
@@ -307,11 +455,11 @@ def _linha_evolucao_nacional(tema: str = "claro") -> go.Figure:
             showspikes=True,
             spikemode="across",
             spikesnap="cursor",
-            spikecolor=cores["texto_suave"],
+            spikecolor=CORES["texto_suave"],
             spikethickness=1,
         ),
-        yaxis=dict(showgrid=True, gridcolor=cores["borda"], title="Índice (Base 2015 = 100)"),
-        hoverlabel=dict(bgcolor=cores["cartao"], font=dict(color=cores["texto"]), bordercolor=cores["borda"]),
+        yaxis=dict(showgrid=True, gridcolor=CORES["borda"], title=_t("eixo_indice", idioma)),
+        hoverlabel=dict(bgcolor=CORES["cartao"], font=dict(color=CORES["texto"]), bordercolor=CORES["borda"]),
         transition=dict(duration=400, easing="cubic-in-out"),
     )
     return fig
@@ -325,38 +473,42 @@ def _dados_filtrados(tipo: str, nivel: str, ano: int, quartil: str) -> pd.DataFr
     )
 
 
-def _dados_exportacao(tipo: str, nivel: str, ano: int, quartil: str) -> pd.DataFrame:
+def _dados_exportacao(tipo: str, nivel: str, ano: int, quartil: str, idioma: str = "pt") -> pd.DataFrame:
     """
     Prepara os dados filtrados para exportação (CSV/Excel): colunas com nomes
-    legíveis, sem o código interno do INE (geocod), ordenadas por região.
+    legíveis (traduzidas para o idioma de quem descarrega), sem o código
+    interno do INE (geocod), ordenadas por região.
     """
     cfg = TIPOS[tipo]
+    rotulo_valor = _t("col_preco" if tipo == "Venda" else "col_renda", idioma)
+    rotulo_regiao = _t("col_regiao", idioma)
     df = _dados_filtrados(tipo, nivel, ano, quartil)[["regiao", "nivel", "ano", "quartil", cfg["coluna"]]].copy()
     df = df.rename(
         columns={
-            "regiao": "Região",
-            "nivel": "Nível geográfico",
-            "ano": "Ano",
-            "quartil": "Quartil",
-            cfg["coluna"]: cfg["rotulo_exportacao"],
+            "regiao": rotulo_regiao,
+            "nivel": _t("col_nivel", idioma),
+            "ano": _t("col_ano", idioma),
+            "quartil": _t("col_quartil", idioma),
+            cfg["coluna"]: rotulo_valor,
         }
     )
-    return df.sort_values("Região").reset_index(drop=True)
+    return df.sort_values(rotulo_regiao).reset_index(drop=True)
 
 
 def _gerar_excel(df: pd.DataFrame, coluna_valor: str, formato_numero: str) -> bytes:
     """
     Gera um .xlsx "pronto a apresentar" a partir de um DataFrame já preparado
-    para exportação: cabeçalho a negrito com fundo verde, colunas com largura
-    ajustada ao conteúdo, 1ª linha fixa ao scroll (freeze panes), filtros
-    automáticos no cabeçalho e a coluna de valores com separador de milhares.
+    para exportação: cabeçalho a negrito com fundo colorido, colunas com
+    largura ajustada ao conteúdo, 1ª linha fixa ao scroll (freeze panes),
+    filtros automáticos no cabeçalho e a coluna de valores com separador de
+    milhares.
     """
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Dados")
         ws = writer.sheets["Dados"]
 
-        fundo_cabecalho = PatternFill(start_color="2F6F4F", end_color="2F6F4F", fill_type="solid")
+        fundo_cabecalho = PatternFill(start_color="B10026", end_color="B10026", fill_type="solid")
         fonte_cabecalho = Font(bold=True, color="FFFFFF")
         for celula in ws[1]:
             celula.fill = fundo_cabecalho
@@ -378,25 +530,23 @@ def _gerar_excel(df: pd.DataFrame, coluna_valor: str, formato_numero: str) -> by
     return buffer.getvalue()
 
 
-def _barras_comparacao(
-    tipo: str, nivel: str, ano: int, quartil: str, tema: str = "claro", foco_geocod=None
-) -> go.Figure:
+def _barras_comparacao(tipo: str, nivel: str, ano: int, quartil: str, foco_geocod=None) -> go.Figure:
     cfg = TIPOS[tipo]
     coluna = cfg["coluna"]
-    cores = _cores(tema)
     df = _dados_filtrados(tipo, nivel, ano, quartil).sort_values(coluna, ascending=True)
 
     # Concelho tem 308 barras — mostra só as 25 mais caras para o gráfico ficar legível
     if nivel == "Concelho" and len(df) > 25:
         df = df.sort_values(coluna, ascending=False).head(25).sort_values(coluna, ascending=True)
 
-    # Cor sólida da marca, como sempre — só ganha um contorno quando o
-    # concelho em foco (pesquisado/clicado no mapa) está entre as barras
-    # visíveis, para o destacar sem mudar a codificação de cor do gráfico.
-    marker = dict(color=cores["destaque"])
+    # Cor sólida "quente" (o mesmo tom mais forte da rampa do mapa) em todas
+    # as barras — só ganha um contorno quando o concelho em foco
+    # (pesquisado/clicado no mapa) está entre as barras visíveis, para o
+    # destacar sem mudar a codificação de cor do gráfico.
+    marker = dict(color=CORES["quente"])
     if foco_geocod is not None and "geocod" in df.columns and (df["geocod"] == foco_geocod).any():
         marker["line"] = dict(
-            color=[cores["texto"] if g == foco_geocod else "rgba(0,0,0,0)" for g in df["geocod"]],
+            color=[CORES["texto"] if g == foco_geocod else "rgba(0,0,0,0)" for g in df["geocod"]],
             width=[2.5 if g == foco_geocod else 0 for g in df["geocod"]],
         )
 
@@ -412,14 +562,14 @@ def _barras_comparacao(
     )
     altura = max(340, 22 * len(df))
     fig.update_layout(
-        margin=dict(l=10, r=10, t=10, b=10),
+        margin=dict(l=10, r=24, t=10, b=10),
         height=altura,
-        plot_bgcolor=cores["cartao"],
-        paper_bgcolor=cores["cartao"],
-        font=dict(color=cores["texto"], family="system-ui, sans-serif"),
-        xaxis=dict(showgrid=True, gridcolor=cores["borda"], title=cfg["unidade_eixo"]),
+        plot_bgcolor=CORES["cartao"],
+        paper_bgcolor=CORES["cartao"],
+        font=dict(color=CORES["texto"], family="system-ui, sans-serif"),
+        xaxis=dict(showgrid=True, gridcolor=CORES["borda"], title=cfg["unidade_eixo"]),
         yaxis=dict(showgrid=False),
-        hoverlabel=dict(bgcolor=cores["cartao"], font=dict(color=cores["texto"]), bordercolor=cores["borda"]),
+        hoverlabel=dict(bgcolor=CORES["cartao"], font=dict(color=CORES["texto"]), bordercolor=CORES["borda"]),
         transition=dict(duration=500, easing="cubic-in-out"),
     )
     return fig
@@ -447,10 +597,9 @@ def _variacao_por_concelho(tipo: str, ano: int, quartil: str) -> pd.DataFrame:
 
 
 def _mapa_concelhos(
-    tipo: str, ano: int, quartil: str, tema: str = "claro", modo: str = "nivel", foco_geocod=None
+    tipo: str, ano: int, quartil: str, modo: str = "nivel", foco_geocod=None, idioma: str = "pt"
 ) -> go.Figure:
     cfg = TIPOS[tipo]
-    cores = _cores(tema)
 
     if modo == "variacao":
         df_var = _variacao_por_concelho(tipo, ano, quartil)
@@ -458,14 +607,14 @@ def _mapa_concelhos(
             fig = go.Figure()
             fig.update_layout(
                 height=440,
-                paper_bgcolor=cores["cartao"],
-                plot_bgcolor=cores["cartao"],
-                font=dict(color=cores["texto_suave"], family="system-ui, sans-serif"),
+                paper_bgcolor=CORES["cartao"],
+                plot_bgcolor=CORES["cartao"],
+                font=dict(color=CORES["texto_suave"], family="system-ui, sans-serif"),
                 xaxis=dict(visible=False),
                 yaxis=dict(visible=False),
                 annotations=[
                     dict(
-                        text=f"Sem dados de {ano - 1} para calcular a variação homóloga de {ano}.",
+                        text=_t("sem_dados_variacao", idioma).format(ano_anterior=ano - 1, ano=ano),
                         showarrow=False,
                         font=dict(size=13),
                     )
@@ -475,7 +624,6 @@ def _mapa_concelhos(
 
         df = df_var.merge(df_crosswalk[["geocod", "con_code"]], on="geocod", how="inner")
         limite = max(abs(df["variacao_pct"].min()), abs(df["variacao_pct"].max()), 0.1)
-        paleta_div = CORES_DIVERGENTE[tema]
         fig = go.Figure(
             go.Choroplethmap(
                 geojson=GEOJSON_CONCELHOS,
@@ -485,15 +633,19 @@ def _mapa_concelhos(
                 zmin=-limite,
                 zmax=limite,
                 colorscale=[
-                    [0, paleta_div["negativo"]],
-                    [0.5, paleta_div["neutro"]],
-                    [1, paleta_div["positivo"]],
+                    [0, CORES_DIVERGENTE["negativo"]],
+                    [0.5, CORES_DIVERGENTE["neutro"]],
+                    [1, CORES_DIVERGENTE["positivo"]],
                 ],
                 marker_line_width=0.3,
-                marker_line_color=cores["cartao"],
-                colorbar=dict(title="Variação (%)", thickness=14, len=0.8, ticksuffix="%"),
+                marker_line_color=CORES["borda"],
+                colorbar=dict(title=_t("colorbar_variacao", idioma), thickness=14, len=0.8, ticksuffix="%"),
                 text=df["regiao"],
-                hovertemplate="%{text}<br>%{z:+.1f}% face a " + str(ano - 1) + "<extra></extra>",
+                hovertemplate="%{text}<br>%{z:+.1f}% "
+                + _t("hover_face_a", idioma)
+                + " "
+                + str(ano - 1)
+                + "<extra></extra>",
             )
         )
     else:
@@ -512,9 +664,8 @@ def _mapa_concelhos(
                 # Contorno num cinzento neutro (não a cor de fundo): o tom mais
                 # claro da rampa viva (#ffffb2) fica quase invisível sobre um
                 # fundo quase branco — sem um contorno que se distinga da
-                # rampa, os concelhos de valor mais baixo "desapareciam" no
-                # tema claro.
-                marker_line_color=cores["borda"],
+                # rampa, os concelhos de valor mais baixo "desapareciam".
+                marker_line_color=CORES["borda"],
                 colorbar=dict(title=cfg["unidade"], thickness=14, len=0.8),
                 text=df["regiao"],
                 hovertemplate="%{text}<br>%{z:" + cfg["formato_hover"] + "} " + cfg["unidade"] + "<extra></extra>",
@@ -532,20 +683,23 @@ def _mapa_concelhos(
                 lat=[lat_foco],
                 lon=[lon_foco],
                 mode="markers",
-                marker=dict(size=18, color=cores["texto"]),
+                # Pino "frio" (azul) de propósito: é a única cor da paleta que
+                # se distingue claramente de QUALQUER tom da rampa quente do
+                # mapa, seja qual for o valor do concelho selecionado.
+                marker=dict(size=18, color=CORES["frio"]),
                 hoverinfo="skip",
                 showlegend=False,
             )
         )
 
     fig.update_layout(
-        map_style="carto-positron" if tema == "claro" else "carto-darkmatter",
+        map_style="carto-positron",
         map_zoom=zoom,
         map_center=centro,
         margin=dict(l=0, r=0, t=0, b=0),
         height=440,
-        paper_bgcolor=cores["cartao"],
-        hoverlabel=dict(bgcolor=cores["cartao"], font=dict(color=cores["texto"]), bordercolor=cores["borda"]),
+        paper_bgcolor=CORES["cartao"],
+        hoverlabel=dict(bgcolor=CORES["cartao"], font=dict(color=CORES["texto"]), bordercolor=CORES["borda"]),
         transition=dict(duration=500, easing="cubic-in-out"),
     )
     return fig
@@ -554,269 +708,218 @@ def _mapa_concelhos(
 app = dash.Dash(__name__, title="Análise de Preços de Habitação em Portugal")
 server = app.server  # necessário para o Render (gunicorn aponta para "app:server")
 
-# Aplica o tema guardado (localStorage) ANTES da primeira pintura da página,
-# num <script> bloqueante logo no <head> — sem isto, uma visita com o tema
-# escuro já guardado mostrava sempre um instante de tema claro antes do
-# JavaScript do Dash arrancar e corrigir o atributo "data-theme".
-app.index_string = """<!DOCTYPE html>
-<html>
-    <head>
-        <script>
-        (function () {
-            try {
-                var guardado = window.localStorage.getItem("tema-armazenado");
-                var tema = guardado ? JSON.parse(guardado) : "claro";
-                document.documentElement.setAttribute(
-                    "data-theme", tema === "escuro" ? "dark" : "light"
-                );
-            } catch (erro) {
-                // localStorage indisponível (ex.: navegação privada) — fica no tema claro por omissão.
-            }
-        })();
-        </script>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
-    </head>
-    <body>
-        {%app_entry%}
-        <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
-        </footer>
-    </body>
-</html>"""
 
-app.layout = html.Div(
-    [
-        dcc.Store(id="tema-armazenado", storage_type="local", data="claro"),
-        dcc.Store(id="concelho-selecionado", data=None),
-        html.Div(id="tema-dummy", style={"display": "none"}),
-        html.Div(
-            [
-                html.Div(
-                    [
-                        html.H1("Análise de Preços de Habitação em Portugal"),
-                        html.P(
-                            "Dados reais e oficiais do INE (Instituto Nacional de Estatística): "
-                            "vendas e arrendamento de alojamentos familiares por concelho, e a "
-                            "evolução do índice de preços de venda da habitação desde 2009.",
-                            className="subtitulo",
-                        ),
-                    ]
-                ),
-                html.Button("🌙 Modo escuro", id="botao-tema", className="botao-tema"),
-            ],
-            className="cabecalho",
-        ),
-        html.Div(id="kpis", className="kpis-linha"),
-        html.Div(
-            [
-                html.Div(
-                    [
-                        html.Label("Tipo"),
-                        dcc.Dropdown(
-                            id="filtro-tipo",
-                            options=[{"label": t, "value": t} for t in TIPOS_DISPONIVEIS],
-                            value="Venda",
-                            clearable=False,
-                        ),
-                    ],
-                    className="filtro",
-                ),
-                html.Div(
-                    [
-                        html.Label("Nível geográfico"),
-                        dcc.Dropdown(
-                            id="filtro-nivel",
-                            options=[{"label": n, "value": n} for n in NIVEIS_DISPONIVEIS],
-                            value="NUTS II",
-                            clearable=False,
-                        ),
-                    ],
-                    className="filtro",
-                ),
-                html.Div(
-                    [
-                        html.Label("Ano"),
-                        dcc.Dropdown(
-                            id="filtro-ano",
-                            options=[{"label": str(a), "value": a} for a in ANOS_DISPONIVEIS],
-                            value=ANO_MAIS_RECENTE,
-                            clearable=False,
-                        ),
-                    ],
-                    className="filtro",
-                ),
-                html.Div(
-                    [
-                        html.Label("Quartil"),
-                        dcc.Dropdown(
-                            id="filtro-quartil",
-                            options=[{"label": q, "value": q} for q in QUARTIS_DISPONIVEIS],
-                            value=QUARTIL_MEDIANA,
-                            clearable=False,
-                        ),
-                    ],
-                    className="filtro",
-                ),
-                html.Div(
-                    [
-                        html.Label("Pesquisar concelho"),
-                        dcc.Dropdown(
-                            id="pesquisa-concelho",
-                            options=CONCELHOS_PESQUISA,
-                            value=None,
-                            placeholder="ex.: Sintra",
-                            clearable=True,
-                            searchable=True,
-                        ),
-                    ],
-                    className="filtro",
-                ),
-                html.Div(
-                    [
-                        html.Label(" "),
-                        html.Button(
-                            "✕ Limpar seleção",
-                            id="botao-limpar-selecao",
-                            className="botao-tema botao-limpar-selecao",
-                            disabled=True,
-                        ),
-                    ],
-                    className="filtro",
-                ),
-                html.Div(
-                    [
-                        html.Label(" "),
-                        html.Button("⬇ Descarregar CSV", id="botao-download", className="botao-download"),
-                        dcc.Download(id="download-dados"),
-                    ],
-                    className="filtro",
-                ),
-                html.Div(
-                    [
-                        html.Label(" "),
-                        html.Button(
-                            "📊 Descarregar Excel",
-                            id="botao-download-excel",
-                            className="botao-download botao-download-excel",
-                        ),
-                        dcc.Download(id="download-excel"),
-                    ],
-                    className="filtro",
-                ),
-            ],
-            className="filtros-linha",
-        ),
-        html.Div(id="painel-concelho", className="painel-concelho"),
-        html.Div(
-            [
-                html.Div(
-                    [
-                        html.H2("Mapa por concelho"),
-                        dcc.RadioItems(
-                            id="filtro-modo-mapa",
-                            options=[
-                                {"label": " Nível de preço", "value": "nivel"},
-                                {
-                                    "label": " Variação homóloga (%)",
-                                    "value": "variacao",
-                                    "disabled": ANO_MAIS_RECENTE - 1 not in ANOS_DISPONIVEIS,
-                                },
-                            ],
-                            value="nivel",
-                            className="modo-mapa",
-                            inline=True,
-                        ),
-                    ],
-                    className="cabecalho-mapa",
-                ),
-                dcc.Graph(id="grafico-mapa", config={"displayModeBar": False}),
-            ],
-            className="cartao-grafico cartao-mapa",
-        ),
-        html.Div(
-            [
-                html.Div(
-                    [
-                        html.H2("Comparação entre regiões"),
-                        dcc.Graph(id="grafico-comparacao", config={"displayModeBar": False}),
-                    ],
-                    className="cartao-grafico",
-                ),
-                html.Div(
-                    [
-                        html.H2("Evolução do índice nacional (desde 2009)"),
-                        dcc.Graph(id="grafico-indice", config={"displayModeBar": False}),
-                    ],
-                    className="cartao-grafico",
-                ),
-            ],
-            className="graficos-grelha",
-        ),
-        html.Footer(
-            [
-                "Fonte: ",
-                html.A("INE — Instituto Nacional de Estatística", href="https://www.ine.pt", target="_blank"),
-                ". Projeto de portefólio de Elisama Manuel.",
-            ],
-            className="rodape",
-        ),
-    ],
-    className="pagina",
-)
+def _construir_layout(idioma: str) -> html.Div:
+    return html.Div(
+        [
+            dcc.Store(id="idioma-armazenado", data=idioma),
+            dcc.Store(id="concelho-selecionado", data=None),
+            html.Div(
+                [
+                    html.H1(_t("titulo", idioma)),
+                    html.P(_t("subtitulo", idioma), className="subtitulo"),
+                ],
+                className="cabecalho",
+            ),
+            html.Div(id="kpis", className="kpis-linha"),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Label(_t("label_tipo", idioma)),
+                            dcc.Dropdown(
+                                id="filtro-tipo",
+                                options=[{"label": _rotulo_tipo(t, idioma), "value": t} for t in TIPOS_DISPONIVEIS],
+                                value="Venda",
+                                clearable=False,
+                            ),
+                        ],
+                        className="filtro",
+                    ),
+                    html.Div(
+                        [
+                            html.Label(_t("label_nivel", idioma)),
+                            dcc.Dropdown(
+                                id="filtro-nivel",
+                                options=[
+                                    {"label": _rotulo_nivel(n, idioma), "value": n} for n in NIVEIS_DISPONIVEIS
+                                ],
+                                value="NUTS II",
+                                clearable=False,
+                            ),
+                        ],
+                        className="filtro",
+                    ),
+                    html.Div(
+                        [
+                            html.Label(_t("label_ano", idioma)),
+                            dcc.Dropdown(
+                                id="filtro-ano",
+                                options=[{"label": str(a), "value": a} for a in ANOS_DISPONIVEIS],
+                                value=ANO_MAIS_RECENTE,
+                                clearable=False,
+                            ),
+                        ],
+                        className="filtro",
+                    ),
+                    html.Div(
+                        [
+                            html.Label(_t("label_quartil", idioma)),
+                            dcc.Dropdown(
+                                id="filtro-quartil",
+                                options=[
+                                    {"label": _rotulo_quartil(q, idioma), "value": q} for q in QUARTIS_DISPONIVEIS
+                                ],
+                                value=QUARTIL_MEDIANA,
+                                clearable=False,
+                            ),
+                        ],
+                        className="filtro",
+                    ),
+                    html.Div(
+                        [
+                            html.Label(_t("label_pesquisa", idioma)),
+                            dcc.Dropdown(
+                                id="pesquisa-concelho",
+                                options=CONCELHOS_PESQUISA,
+                                value=None,
+                                placeholder=_t("placeholder_pesquisa", idioma),
+                                clearable=True,
+                                searchable=True,
+                            ),
+                        ],
+                        className="filtro",
+                    ),
+                    html.Div(
+                        [
+                            html.Label(" "),
+                            html.Button(
+                                _t("botao_limpar_selecao", idioma),
+                                id="botao-limpar-selecao",
+                                className="botao-neutro botao-limpar-selecao",
+                                disabled=True,
+                            ),
+                        ],
+                        className="filtro",
+                    ),
+                    html.Div(
+                        [
+                            html.Label(" "),
+                            html.Button(_t("botao_csv", idioma), id="botao-download", className="botao-download"),
+                            dcc.Download(id="download-dados"),
+                        ],
+                        className="filtro",
+                    ),
+                    html.Div(
+                        [
+                            html.Label(" "),
+                            html.Button(
+                                _t("botao_excel", idioma),
+                                id="botao-download-excel",
+                                className="botao-download botao-download-excel",
+                            ),
+                            dcc.Download(id="download-excel"),
+                        ],
+                        className="filtro",
+                    ),
+                ],
+                className="filtros-linha",
+            ),
+            html.Div(id="painel-concelho", className="painel-concelho"),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H2(_t("titulo_mapa", idioma)),
+                            dcc.RadioItems(
+                                id="filtro-modo-mapa",
+                                options=[
+                                    {"label": _t("modo_nivel", idioma), "value": "nivel"},
+                                    {
+                                        "label": _t("modo_variacao", idioma),
+                                        "value": "variacao",
+                                        "disabled": ANO_MAIS_RECENTE - 1 not in ANOS_DISPONIVEIS,
+                                    },
+                                ],
+                                value="nivel",
+                                className="modo-mapa",
+                                inline=True,
+                            ),
+                        ],
+                        className="cabecalho-mapa",
+                    ),
+                    dcc.Graph(id="grafico-mapa", config={"displayModeBar": False}),
+                ],
+                className="cartao-grafico cartao-mapa",
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H2(_t("titulo_comparacao", idioma)),
+                            dcc.Graph(id="grafico-comparacao", config={"displayModeBar": False}),
+                        ],
+                        className="cartao-grafico",
+                    ),
+                    html.Div(
+                        [
+                            html.H2(_t("titulo_indice", idioma)),
+                            dcc.Graph(id="grafico-indice", config={"displayModeBar": False}),
+                        ],
+                        className="cartao-grafico",
+                    ),
+                ],
+                className="graficos-grelha",
+            ),
+            html.Footer(
+                [
+                    _t("rodape_fonte", idioma),
+                    html.A(_t("rodape_ine", idioma), href="https://www.ine.pt", target="_blank"),
+                    _t("rodape_projeto", idioma),
+                ],
+                className="rodape",
+            ),
+        ],
+        className="pagina",
+    )
 
 
-app.clientside_callback(
-    """
-    function(tema) {
-        document.documentElement.setAttribute('data-theme', tema === 'escuro' ? 'dark' : 'light');
-        return '';
-    }
-    """,
-    Output("tema-dummy", "children"),
-    Input("tema-armazenado", "data"),
-)
-
-app.clientside_callback(
-    """
-    function(n_clicks, tema_atual) {
-        if (!n_clicks) { return window.dash_clientside.no_update; }
-        return tema_atual === 'escuro' ? 'claro' : 'escuro';
-    }
-    """,
-    Output("tema-armazenado", "data"),
-    Input("botao-tema", "n_clicks"),
-    State("tema-armazenado", "data"),
-)
+def _layout():
+    return _construir_layout(_idioma_do_pedido())
 
 
-@app.callback(Output("botao-tema", "children"), Input("tema-armazenado", "data"))
-def _atualizar_texto_botao_tema(tema):
-    return "☀️ Modo claro" if tema == "escuro" else "🌙 Modo escuro"
+app.layout = _layout
+# O Dash usa isto para validar os IDs referenciados nos callbacks quando o
+# "layout" é uma função (não pode inspecionar uma função sem a chamar) — sem
+# isto, o arranque do servidor avisa/falha a validar callbacks contra IDs que
+# "não existem no layout".
+app.validation_layout = _construir_layout(IDIOMA_OMISSAO)
 
 
 @app.callback(
     Output("filtro-modo-mapa", "options"),
     Output("filtro-modo-mapa", "value"),
     Input("filtro-ano", "value"),
+    Input("idioma-armazenado", "data"),
     State("filtro-modo-mapa", "value"),
 )
-def _atualizar_opcoes_modo_mapa(ano, modo_atual):
+def _atualizar_opcoes_modo_mapa(ano, idioma, modo_atual):
     tem_ano_anterior = (ano - 1) in ANOS_DISPONIVEIS
     opcoes = [
-        {"label": " Nível de preço", "value": "nivel"},
-        {"label": " Variação homóloga (%)", "value": "variacao", "disabled": not tem_ano_anterior},
+        {"label": _t("modo_nivel", idioma), "value": "nivel"},
+        {"label": _t("modo_variacao", idioma), "value": "variacao", "disabled": not tem_ano_anterior},
     ]
     novo_modo = modo_atual if (modo_atual == "nivel" or tem_ano_anterior) else "nivel"
     return opcoes, novo_modo
 
 
-@app.callback(Output("kpis", "children"), Input("filtro-tipo", "value"), Input("filtro-ano", "value"))
-def _atualizar_kpis(tipo, ano):
+@app.callback(
+    Output("kpis", "children"),
+    Input("filtro-tipo", "value"),
+    Input("filtro-ano", "value"),
+    Input("idioma-armazenado", "data"),
+)
+def _atualizar_kpis(tipo, ano, idioma):
     cfg = TIPOS[tipo]
     k = _kpis_para_ano(tipo, ano)
     cartoes = []
@@ -824,15 +927,15 @@ def _atualizar_kpis(tipo, ano):
     valor_nacional = cfg["formato_curto"].format(k["valor_nacional"]) + f" {cfg['unidade']}" if k[
         "valor_nacional"
     ] else "—"
-    titulo_nacional = "Renda mediana nacional" if tipo == "Arrendamento" else "Preço mediano nacional"
+    titulo_nacional = _t("kpi_nacional_arrendamento" if tipo == "Arrendamento" else "kpi_nacional_venda", idioma)
     nota_variacao = ""
     if k["variacao"] is not None:
         sinal = "+" if k["variacao"] >= 0 else ""
-        nota_variacao = f"{sinal}{k['variacao']:.1f}% desde {ano - 1}"
+        nota_variacao = _t("nota_variacao", idioma).format(sinal=sinal, valor=k["variacao"], ano=ano - 1)
     cartoes.append(_cartao_kpi(titulo_nacional, valor_nacional, nota_variacao))
 
-    rotulo_caro = "Concelho mais caro" if tipo == "Venda" else "Concelho com renda mais alta"
-    rotulo_barato = "Concelho mais acessível" if tipo == "Venda" else "Concelho com renda mais baixa"
+    rotulo_caro = _t("kpi_caro_arrendamento" if tipo == "Arrendamento" else "kpi_caro_venda", idioma)
+    rotulo_barato = _t("kpi_barato_arrendamento" if tipo == "Arrendamento" else "kpi_barato_venda", idioma)
 
     if k["mais_caro"] is not None:
         cartoes.append(
@@ -840,6 +943,7 @@ def _atualizar_kpis(tipo, ano):
                 rotulo_caro,
                 k["mais_caro"]["regiao"],
                 cfg["formato_curto"].format(k["mais_caro"][cfg["coluna"]]) + f" {cfg['unidade']}",
+                tom="quente",
             )
         )
     if k["mais_barato"] is not None:
@@ -848,9 +952,10 @@ def _atualizar_kpis(tipo, ano):
                 rotulo_barato,
                 k["mais_barato"]["regiao"],
                 cfg["formato_curto"].format(k["mais_barato"][cfg["coluna"]]) + f" {cfg['unidade']}",
+                tom="frio",
             )
         )
-    cartoes.append(_cartao_kpi("Concelhos analisados", "308", "todo o país"))
+    cartoes.append(_cartao_kpi(_t("kpi_concelhos_titulo", idioma), "308", _t("kpi_concelhos_nota", idioma)))
     return cartoes
 
 
@@ -860,11 +965,10 @@ def _atualizar_kpis(tipo, ano):
     Input("filtro-nivel", "value"),
     Input("filtro-ano", "value"),
     Input("filtro-quartil", "value"),
-    Input("tema-armazenado", "data"),
     Input("concelho-selecionado", "data"),
 )
-def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil, tema, foco_geocod):
-    return _barras_comparacao(tipo, nivel, ano, quartil, tema, foco_geocod)
+def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil, foco_geocod):
+    return _barras_comparacao(tipo, nivel, ano, quartil, foco_geocod)
 
 
 @app.callback(
@@ -873,11 +977,11 @@ def _atualizar_grafico_comparacao(tipo, nivel, ano, quartil, tema, foco_geocod):
     Input("filtro-ano", "value"),
     Input("filtro-quartil", "value"),
     Input("filtro-modo-mapa", "value"),
-    Input("tema-armazenado", "data"),
     Input("concelho-selecionado", "data"),
+    Input("idioma-armazenado", "data"),
 )
-def _atualizar_mapa(tipo, ano, quartil, modo, tema, foco_geocod):
-    return _mapa_concelhos(tipo, ano, quartil, tema, modo, foco_geocod)
+def _atualizar_mapa(tipo, ano, quartil, modo, foco_geocod, idioma):
+    return _mapa_concelhos(tipo, ano, quartil, modo, foco_geocod, idioma)
 
 
 @app.callback(
@@ -922,8 +1026,9 @@ def _atualizar_estado_botao_limpar(geocod):
     Input("filtro-tipo", "value"),
     Input("filtro-ano", "value"),
     Input("filtro-quartil", "value"),
+    Input("idioma-armazenado", "data"),
 )
-def _atualizar_painel_concelho(geocod, tipo, ano, quartil):
+def _atualizar_painel_concelho(geocod, tipo, ano, quartil, idioma):
     if not geocod:
         return []
 
@@ -934,7 +1039,7 @@ def _atualizar_painel_concelho(geocod, tipo, ano, quartil):
     valor_texto = (
         cfg["formato_curto"].format(linha[cfg["coluna"]].iloc[0]) + f" {cfg['unidade']}"
         if not linha.empty
-        else "Sem dados para este filtro"
+        else _t("sem_dados_filtro", idioma)
     )
 
     nota_variacao = ""
@@ -944,14 +1049,14 @@ def _atualizar_painel_concelho(geocod, tipo, ano, quartil):
         if not linha_var.empty:
             variacao = linha_var["variacao_pct"].iloc[0]
             sinal = "+" if variacao >= 0 else ""
-            nota_variacao = f"{sinal}{variacao:.1f}% desde {ano - 1}"
+            nota_variacao = _t("nota_variacao", idioma).format(sinal=sinal, valor=variacao, ano=ano - 1)
 
-    return [_cartao_kpi(f"📍 {nome}", valor_texto, nota_variacao)]
+    return [_cartao_kpi(f"📍 {nome}", valor_texto, nota_variacao, tom="quente")]
 
 
-@app.callback(Output("grafico-indice", "figure"), Input("tema-armazenado", "data"))
-def _atualizar_grafico_indice(tema):
-    return _linha_evolucao_nacional(tema)
+@app.callback(Output("grafico-indice", "figure"), Input("idioma-armazenado", "data"))
+def _atualizar_grafico_indice(idioma):
+    return _linha_evolucao_nacional(idioma)
 
 
 @app.callback(
@@ -961,10 +1066,11 @@ def _atualizar_grafico_indice(tema):
     State("filtro-nivel", "value"),
     State("filtro-ano", "value"),
     State("filtro-quartil", "value"),
+    State("idioma-armazenado", "data"),
     prevent_initial_call=True,
 )
-def _descarregar_csv(n_clicks, tipo, nivel, ano, quartil):
-    df = _dados_exportacao(tipo, nivel, ano, quartil)
+def _descarregar_csv(n_clicks, tipo, nivel, ano, quartil, idioma):
+    df = _dados_exportacao(tipo, nivel, ano, quartil, idioma)
     nome_ficheiro = f"{tipo.lower()}_{nivel.lower().replace(' ', '-')}_{ano}.csv"
     # Excel em português usa a vírgula como separador decimal, por isso espera
     # o ";" como separador de colunas (senão interpreta o ficheiro inteiro
@@ -988,12 +1094,14 @@ def _descarregar_csv(n_clicks, tipo, nivel, ano, quartil):
     State("filtro-nivel", "value"),
     State("filtro-ano", "value"),
     State("filtro-quartil", "value"),
+    State("idioma-armazenado", "data"),
     prevent_initial_call=True,
 )
-def _descarregar_excel(n_clicks, tipo, nivel, ano, quartil):
+def _descarregar_excel(n_clicks, tipo, nivel, ano, quartil, idioma):
     cfg = TIPOS[tipo]
-    df = _dados_exportacao(tipo, nivel, ano, quartil)
-    conteudo = _gerar_excel(df, cfg["rotulo_exportacao"], cfg["formato_excel"])
+    df = _dados_exportacao(tipo, nivel, ano, quartil, idioma)
+    rotulo_valor = _t("col_preco" if tipo == "Venda" else "col_renda", idioma)
+    conteudo = _gerar_excel(df, rotulo_valor, cfg["formato_excel"])
     nome_ficheiro = f"{tipo.lower()}_{nivel.lower().replace(' ', '-')}_{ano}.xlsx"
     return dcc.send_bytes(lambda buffer: buffer.write(conteudo), nome_ficheiro)
 
